@@ -82,7 +82,7 @@ class ConnectionSidebarViewModel {
             try? await Task.sleep(nanoseconds: 0.05.nanoseconds)
         }
 
-        if appState.connection.currentConnection != nil {
+        if appState.connection.activeConnection != nil {
             hasRestoredConnection = true
             Self.hasRestoredConnectionGlobally = true
         }
@@ -90,9 +90,11 @@ class ConnectionSidebarViewModel {
 
     /// Restore the last used connection from UserDefaults
     func restoreLastConnection(connections: [ConnectionProfile]) async {
+        // Also check activeConnection so a SQLite session (where currentConnection shim
+        // returns nil) does not trigger an unwanted Postgres reconnect.
         guard !hasRestoredConnection,
             !Self.hasRestoredConnectionGlobally,
-            appState.connection.currentConnection == nil
+            appState.connection.activeConnection == nil
         else { return }
 
         hasRestoredConnection = true

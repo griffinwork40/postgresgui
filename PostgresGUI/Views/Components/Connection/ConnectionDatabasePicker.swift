@@ -45,7 +45,11 @@ struct ConnectionDatabasePicker: View {
             )
             if hasConnection {
                 separatorChevron
-                databasePickerButton
+                if case .sqlite(let profile) = appState.connection.activeConnection {
+                    sqliteFileLabel(profile)
+                } else {
+                    databasePickerButton
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .center)
@@ -55,7 +59,21 @@ struct ConnectionDatabasePicker: View {
     }
 
     private var hasConnection: Bool {
-        appState.connection.currentConnection != nil
+        appState.connection.activeConnection != nil
+    }
+
+    // MARK: - SQLite File Label
+
+    private func sqliteFileLabel(_ profile: DatabaseFileProfile) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "externaldrive")
+                .font(.system(size: 14))
+                .foregroundColor(.secondary)
+            Text(profile.fileName)
+                .font(.system(size: PickerFontSize.label))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+        }
     }
 
     // MARK: - Separator

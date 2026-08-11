@@ -52,6 +52,10 @@ class AppState {
         navigation.showConnectionForm()
     }
 
+    func showFileOpen() {
+        navigation.showFileOpen()
+    }
+
     // MARK: - Query Execution
 
     /// Request a table query and cancel any in-flight table query task.

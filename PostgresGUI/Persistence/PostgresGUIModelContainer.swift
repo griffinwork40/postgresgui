@@ -35,24 +35,41 @@ enum PostgresGUISchemaV2: VersionedSchema {
     }
 }
 
+enum PostgresGUISchemaV3: VersionedSchema {
+    static var versionIdentifier = Schema.Version(1, 2, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [
+            ConnectionProfile.self,
+            SavedQuery.self,
+            QueryFolder.self,
+            TabState.self,
+            QueryHistory.self,
+            DatabaseFileProfile.self,
+        ]
+    }
+}
+
 enum PostgresGUIMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
         [
             PostgresGUISchemaV1.self,
             PostgresGUISchemaV2.self,
+            PostgresGUISchemaV3.self,
         ]
     }
 
     static var stages: [MigrationStage] {
         [
             .lightweight(fromVersion: PostgresGUISchemaV1.self, toVersion: PostgresGUISchemaV2.self),
+            .lightweight(fromVersion: PostgresGUISchemaV2.self, toVersion: PostgresGUISchemaV3.self),
         ]
     }
 }
 
 enum PostgresGUIModelContainerFactory {
     static var currentSchema: Schema {
-        Schema(versionedSchema: PostgresGUISchemaV2.self)
+        Schema(versionedSchema: PostgresGUISchemaV3.self)
     }
 
     static func makeModelContainer(

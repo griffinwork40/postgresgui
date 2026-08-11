@@ -35,6 +35,20 @@ struct WelcomeView: View {
             .tint(.primary)
             .controlSize(.large)
             .accessibilityIdentifier("connectToServerButton")
+
+            Button(action: showFileOpen) {
+                HStack {
+                    Text("Open SQLite Database...")
+                    Spacer()
+                    Image(systemName: "internaldrive")
+                }
+                .frame(minWidth: 160, maxWidth: 200)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.glass)
+            .tint(.primary)
+            .controlSize(.large)
+            .accessibilityIdentifier("openSQLiteDatabaseButton")
         }
         .frame(minWidth: 500, maxWidth: .infinity, minHeight: 500, maxHeight: .infinity)
         .padding(.horizontal)
@@ -44,5 +58,9 @@ struct WelcomeView: View {
     
     private func showConnectionForm() {
         appState.showConnectionForm()
+    }
+
+    private func showFileOpen() {
+        appState.showFileOpen()
     }
 }

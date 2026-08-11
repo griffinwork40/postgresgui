@@ -185,6 +185,25 @@ class ConnectionService: ConnectionServiceProtocol {
         DebugLog.print("✅ [ConnectionService] Connection deleted")
     }
 
+    // MARK: - SQLite File Connection
+
+    /// Connect to a SQLite database file.
+    /// This method is NOT part of ConnectionServiceProtocol — it is SQLite-specific.
+    func connectFile(to profile: DatabaseFileProfile) async -> ConnectionResult {
+        do {
+            DebugLog.print("📂 [ConnectionService] Opening SQLite file: \(profile.filePath)")
+            let sqliteService = SQLiteDatabaseService()
+            try await sqliteService.connect(filePath: profile.filePath, readOnly: profile.isReadOnly)
+            appState.connection.databaseService = sqliteService
+            appState.connection.activeConnection = .sqlite(profile)
+            DebugLog.print("✅ [ConnectionService] SQLite file opened: \(profile.displayName)")
+            return .success
+        } catch {
+            DebugLog.print("❌ [ConnectionService] SQLite file open failed: \(error)")
+            return .failure(error)
+        }
+    }
+
     // MARK: - Private Helpers
 
     private func loadDatabases() async {

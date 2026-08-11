@@ -108,6 +108,13 @@ protocol DatabaseServiceProtocol: AnyObject {
     func fetchColumnInfo(schema: String, table: String) async throws -> [ColumnInfo]
 }
 
+// MARK: - Default Implementations
+
+extension DatabaseServiceProtocol {
+    /// Default no-op for file-based connections; SQLiteDatabaseService overrides this.
+    func connectFile(filePath: String, readOnly: Bool) async throws {}
+}
+
 // MARK: - DatabaseService Conformance
 
 extension DatabaseService: DatabaseServiceProtocol {

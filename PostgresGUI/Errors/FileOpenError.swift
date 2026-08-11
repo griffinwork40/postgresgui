@@ -14,6 +14,7 @@ enum FileOpenError: LocalizedError, Equatable {
     case fileLocked(String)
     case notConnected
     case unknownError(String)
+    case notSupported
 
     var errorDescription: String? {
         switch self {
@@ -29,6 +30,8 @@ enum FileOpenError: LocalizedError, Equatable {
             return "No database is currently open."
         case .unknownError(let message):
             return message
+        case .notSupported:
+            return "Operation not supported for file-based databases."
         }
     }
 
@@ -46,6 +49,8 @@ enum FileOpenError: LocalizedError, Equatable {
             return "Open a database file first."
         case .unknownError:
             return nil
+        case .notSupported:
+            return "Use a PostgreSQL connection for this feature."
         }
     }
 }

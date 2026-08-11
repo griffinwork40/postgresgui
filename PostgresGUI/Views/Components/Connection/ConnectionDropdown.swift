@@ -28,7 +28,15 @@ struct ConnectionDropdown: View {
     let onCreate: () -> Void
 
     private var hasConnection: Bool {
-        appState.connection.currentConnection != nil
+        appState.connection.activeConnection != nil
+    }
+
+    private var connectionDisplayName: String {
+        switch appState.connection.activeConnection {
+        case .postgres(let p): return p.displayName
+        case .sqlite(let p): return p.displayName
+        case nil: return "Select Connection"
+        }
     }
 
     var body: some View {
@@ -63,7 +71,7 @@ struct ConnectionDropdown: View {
                 Text("⚠️")
                     .font(.system(size: 12))
             }
-            Text(appState.connection.currentConnection?.displayName ?? "Select Connection")
+            Text(connectionDisplayName)
                 .font(.system(size: DropdownFontSize.label))
                 .foregroundColor(hasConnection ? .primary : .secondary)
                 .opacity(opacity)

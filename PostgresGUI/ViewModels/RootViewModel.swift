@@ -349,6 +349,48 @@ class RootViewModel {
         tabManager.closeTab(activeTab)
     }
 
+    // MARK: - SQLite File Connection
+
+    /// Open a SQLite database file and load its tables.
+    func connectSQLiteFile(profile: DatabaseFileProfile) async {
+        loadingState.setPhase(.connectingToDatabase)
+
+        let connectionService = ConnectionService(
+            appState: appState,
+            keychainService: keychainService
+        )
+
+        let result = await connectionService.connectFile(to: profile)
+        guard case .success = result else {
+            if case .failure(let error) = result {
+                initializationError = error.localizedDescription
+            }
+            loadingState.setReady()
+            return
+        }
+
+        loadingState.setPhase(.loadingTables)
+        await loadTablesForSQLite()
+        loadingState.setReady()
+    }
+
+    private func loadTablesForSQLite() async {
+        appState.connection.isLoadingTables = true
+        defer { appState.connection.isLoadingTables = false }
+        do {
+            let tables = try await appState.connection.databaseService.fetchTables(database: "main")
+            appState.connection.tables = tables
+            appState.connection.schemas = ["main"]
+            appState.connection.selectedSchema = nil
+            appState.connection.selectedDatabase = nil
+            // SQLite has no SET search_path — skip setSchemaSearchPath
+            DebugLog.print("✅ [RootViewModel] SQLite tables loaded: \(tables.count)")
+        } catch {
+            DebugLog.print("❌ [RootViewModel] Failed to load SQLite tables: \(error)")
+            initializationError = error.localizedDescription
+        }
+    }
+
     // MARK: - Database Selection
 
     /// Select a database and load its tables

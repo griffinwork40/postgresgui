@@ -20,6 +20,7 @@ class NavigationState {
     var isShowingCreateDatabase: Bool = false
     var isShowingKeyboardShortcuts: Bool = false
     var isShowingHelp: Bool = false
+    var isShowingFileOpen: Bool = false
 
     // Sheet management helpers
     func showConnectionForm() {
@@ -28,5 +29,9 @@ class NavigationState {
 
     func showCreateDatabase() {
         isShowingCreateDatabase = true
+    }
+
+    func showFileOpen() {
+        isShowingFileOpen = true
     }
 }

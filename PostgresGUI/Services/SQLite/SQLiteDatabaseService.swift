@@ -224,3 +224,4 @@ extension SQLiteDatabaseService: DatabaseServiceProtocol {
         try await connect(filePath: filePath, readOnly: readOnly)
     }
 }
+

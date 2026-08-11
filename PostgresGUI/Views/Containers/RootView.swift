@@ -15,6 +15,7 @@ struct RootView: View {
     @State private var viewModel: RootViewModel?
     @State private var tabChangeTask: Task<Void, Never>?
     @Query private var connections: [ConnectionProfile]
+    @Query private var fileProfiles: [DatabaseFileProfile]
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.keychainService) private var keychainService
@@ -24,7 +25,8 @@ struct RootView: View {
             Group {
                 if shouldShowWelcomeScreen(
                     connectionCount: connections.count,
-                    isShowingConnectionForm: appState.navigation.isShowingConnectionForm
+                    isShowingConnectionForm: appState.navigation.isShowingConnectionForm,
+                    fileProfileCount: fileProfiles.count
                 ) {
                     WelcomeView()
                         .environment(appState)
@@ -59,6 +61,17 @@ struct RootView: View {
             CreateDatabaseView { database in
                 Task {
                     await viewModel?.selectDatabase(database)
+                }
+            }
+            .environment(appState)
+        }
+        .sheet(isPresented: Binding(
+            get: { appState.navigation.isShowingFileOpen },
+            set: { appState.navigation.isShowingFileOpen = $0 }
+        )) {
+            FileOpenView { profile in
+                Task {
+                    await viewModel?.connectSQLiteFile(profile: profile)
                 }
             }
             .environment(appState)
