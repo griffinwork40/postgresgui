@@ -76,3 +76,4 @@ fastlane/test_output
 *.dmg
 check_uttype
 default.profraw
+.afk-worktrees/
