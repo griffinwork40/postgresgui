@@ -19,6 +19,7 @@ struct MainSplitView: View {
     @State private var searchText: String = ""
     @State private var viewModel: DetailContentViewModel?
     @State private var selectedQueryIDs: Set<SavedQuery.ID> = []
+    @State private var showHealthInspector: Bool = false
 
     /// Window title: shows the SQLite filename when a file is open, or the Postgres database name.
     private var navigationTitleText: String {
@@ -83,6 +84,17 @@ struct MainSplitView: View {
                 if let viewModel = viewModel {
                     DetailContentToolbar(viewModel: viewModel)
                 }
+                // Health Inspector toolbar button — only shown when a SQLite file is open
+                if appState.connection.activeConnection?.sqliteProfile != nil {
+                    ToolbarItem(placement: .automatic) {
+                        Button {
+                            showHealthInspector = true
+                        } label: {
+                            Label("Database Health", systemImage: "heart.text.square")
+                        }
+                        .help("Open the Database Health Inspector")
+                    }
+                }
             }
             .onAppear {
                 if viewModel == nil {
@@ -102,6 +114,11 @@ struct MainSplitView: View {
         .navigationTitle(navigationTitleText)
         .searchable(text: $searchText, prompt: "Filter results")
         .modifier(DetailContentModalsWrapper(viewModel: viewModel))
+        .sheet(isPresented: $showHealthInspector) {
+            if let sqliteService = appState.connection.databaseService as? SQLiteDatabaseService {
+                HealthInspectorView(service: sqliteService)
+            }
+        }
         .overlay(alignment: .bottomTrailing) {
             if let toast = appState.query.mutationToast {
                 MutationToastView(

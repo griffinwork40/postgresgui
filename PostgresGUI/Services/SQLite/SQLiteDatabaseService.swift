@@ -142,6 +142,49 @@ class SQLiteDatabaseService {
         if let error = typed.error { throw error }
         return typed.toDisplayRows()
     }
+
+    // MARK: - Database Health
+
+    /// Fetch a comprehensive health snapshot using PRAGMAs.
+    func fetchDatabaseHealth() async throws -> DatabaseHealth {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        let filePath = _currentFilePath
+        return try await connectionManager.withDatabase { db in
+            try PragmaQueryService.fetchHealth(db: db, filePath: filePath)
+        }
+    }
+
+    /// Run a full PRAGMA integrity_check. May be slow on large databases.
+    func runIntegrityCheck() async throws -> IntegrityCheckResult {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        return try await connectionManager.withDatabase { db in
+            try PragmaQueryService.runIntegrityCheck(db: db)
+        }
+    }
+
+    /// Run a PRAGMA quick_check (faster, less thorough than integrity_check).
+    func runQuickCheck() async throws -> IntegrityCheckResult {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        return try await connectionManager.withDatabase { db in
+            try PragmaQueryService.runQuickCheck(db: db)
+        }
+    }
+
+    /// Rebuild the database file, reclaiming free pages and defragmenting storage.
+    func runVacuum() async throws {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        try await connectionManager.withDatabaseWrite { db in
+            try db.execute(sql: "VACUUM")
+        }
+    }
+
+    /// Update query planner statistics for all tables.
+    func runAnalyze() async throws {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        try await connectionManager.withDatabaseWrite { db in
+            try db.execute(sql: "ANALYZE")
+        }
+    }
 }
 
 // MARK: - DatabaseServiceProtocol Conformance
