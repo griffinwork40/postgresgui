@@ -18,7 +18,6 @@ struct AppLaunchDecisionsTests {
         @Test func showsWelcomeWhenNoConnectionsAndNoFileProfiles() {
             let result = shouldShowWelcomeScreen(
                 connectionCount: 0,
-                isShowingConnectionForm: false,
                 fileProfileCount: 0
             )
             #expect(result == true)
@@ -27,7 +26,6 @@ struct AppLaunchDecisionsTests {
         @Test func hidesWelcomeWhenHasPostgresConnection() {
             let result = shouldShowWelcomeScreen(
                 connectionCount: 1,
-                isShowingConnectionForm: false,
                 fileProfileCount: 0
             )
             #expect(result == false)
@@ -36,17 +34,7 @@ struct AppLaunchDecisionsTests {
         @Test func hidesWelcomeWhenHasFileProfile() {
             let result = shouldShowWelcomeScreen(
                 connectionCount: 0,
-                isShowingConnectionForm: false,
                 fileProfileCount: 1
-            )
-            #expect(result == false)
-        }
-
-        @Test func hidesWelcomeWhenConnectionFormShowing() {
-            let result = shouldShowWelcomeScreen(
-                connectionCount: 0,
-                isShowingConnectionForm: true,
-                fileProfileCount: 0
             )
             #expect(result == false)
         }
@@ -54,7 +42,6 @@ struct AppLaunchDecisionsTests {
         @Test func hidesWelcomeWhenBothConnectionAndFileProfile() {
             let result = shouldShowWelcomeScreen(
                 connectionCount: 1,
-                isShowingConnectionForm: false,
                 fileProfileCount: 1
             )
             #expect(result == false)
@@ -63,16 +50,14 @@ struct AppLaunchDecisionsTests {
         @Test func backwardCompatDefaultFileProfileCountShowsWelcomeWhenNoConnections() {
             // Verify the default = 0 parameter keeps old call sites working
             let result = shouldShowWelcomeScreen(
-                connectionCount: 0,
-                isShowingConnectionForm: false
+                connectionCount: 0
             )
             #expect(result == true)
         }
 
         @Test func backwardCompatDefaultFileProfileCountHidesWelcomeWhenHasConnections() {
             let result = shouldShowWelcomeScreen(
-                connectionCount: 1,
-                isShowingConnectionForm: false
+                connectionCount: 1
             )
             #expect(result == false)
         }

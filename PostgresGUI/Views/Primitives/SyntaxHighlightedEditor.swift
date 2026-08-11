@@ -29,15 +29,40 @@ private struct SQLSyntaxHighlighter {
 
         init() {
             do {
+                // SQLite keywords — organized by category for maintainability
+                // DML + DDL + clauses + expressions + types + transactions + SQLite-specific
                 keyword = try NSRegularExpression(
-                    pattern: "\\b(SELECT|FROM|WHERE|JOIN|INNER|LEFT|RIGHT|FULL|OUTER|ON|AS|ORDER|BY|GROUP|HAVING|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TABLE|INDEX|VIEW|DATABASE|SCHEMA|UNION|INTERSECT|EXCEPT|DISTINCT|LIMIT|OFFSET|CASE|WHEN|THEN|ELSE|END|IF|EXISTS|NULL|NOT|AND|OR|IN|LIKE|ILIKE|SIMILAR|TO|BETWEEN|IS|CAST|COALESCE|NULLIF|GREATEST|LEAST|EXTRACT|DATE_PART|NOW|CURRENT_DATE|CURRENT_TIME|CURRENT_TIMESTAMP|TRUE|FALSE|BOOLEAN|INTEGER|BIGINT|SMALLINT|DECIMAL|NUMERIC|REAL|DOUBLE|PRECISION|CHAR|VARCHAR|TEXT|BYTEA|DATE|TIME|TIMESTAMP|INTERVAL|ARRAY|JSON|JSONB|UUID|SERIAL|BIGSERIAL|PRIMARY|KEY|FOREIGN|REFERENCES|UNIQUE|CHECK|DEFAULT|CONSTRAINT|USING|WITH|WITHOUT|OIDS|TABLESPACE|STORAGE|PARAMETER|SET|RESET|SHOW|GRANT|REVOKE|EXPLAIN|ANALYZE|VACUUM|REINDEX|CLUSTER|TRUNCATE|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|TRANSACTION|ISOLATION|LEVEL|READ|WRITE|ONLY|UNCOMMITTED|COMMITTED|REPEATABLE|SERIALIZABLE|LOCK|FOR|UPDATE|SHARE|NOWAIT|SKIP|LOCKED|RETURNING|RETURNS|LANGUAGE|PLPGSQL|FUNCTION|PROCEDURE|TRIGGER|SEQUENCE|TYPE|DOMAIN|ENUM|AGGREGATE|OPERATOR|OPERATOR\\s+CLASS|OPERATOR\\s+FAMILY|RULE|POLICY|EXTENSION|COLLATION|CONVERSION|TEXT\\s+SEARCH|CONFIGURATION|DICTIONARY|PARSER|TEMPLATE|ROLE|USER|GROUP|PASSWORD|SUPERUSER|CREATEDB|CREATEROLE|INHERIT|LOGIN|REPLICATION|BYPASSRLS|CONNECTION\\s+LIMIT|VALID|UNTIL|IN\\s+SCHEMA|PUBLIC|CURRENT_SCHEMA|SEARCH_PATH)\\b",
+                    pattern: """
+                    \\b(SELECT|INSERT|UPDATE|DELETE|REPLACE|\
+                    FROM|WHERE|JOIN|INNER|LEFT|RIGHT|FULL|OUTER|CROSS|NATURAL|ON|USING|\
+                    AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|DISTINCT|ALL|\
+                    UNION|INTERSECT|EXCEPT|\
+                    CREATE|ALTER|DROP|TABLE|INDEX|VIEW|TRIGGER|VIRTUAL|TEMP|TEMPORARY|\
+                    WITHOUT|ROWID|STRICT|IF|EXISTS|\
+                    UNIQUE|PRIMARY|KEY|FOREIGN|REFERENCES|CHECK|DEFAULT|NOT|NULL|\
+                    COLLATE|AUTOINCREMENT|CONSTRAINT|GENERATED|ALWAYS|STORED|\
+                    CASE|WHEN|THEN|ELSE|END|CAST|COALESCE|NULLIF|\
+                    AND|OR|IN|LIKE|GLOB|BETWEEN|IS|MATCH|REGEXP|ESCAPE|\
+                    WITH|RECURSIVE|\
+                    BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE|TRANSACTION|\
+                    DEFERRED|IMMEDIATE|EXCLUSIVE|\
+                    PRAGMA|ATTACH|DETACH|EXPLAIN|QUERY|PLAN|VACUUM|REINDEX|ANALYZE|\
+                    SET|INTO|VALUES|RETURNING|DO|NOTHING|CONFLICT|\
+                    ABORT|FAIL|IGNORE|\
+                    INTEGER|REAL|TEXT|BLOB|NUMERIC|TRUE|FALSE|\
+                    OVER|PARTITION|ROWS|RANGE|GROUPS|UNBOUNDED|PRECEDING|FOLLOWING|\
+                    CURRENT|ROW|EXCLUDE|TIES|OTHERS|NO|FILTER|\
+                    INDEXED|TO|FOR|EACH|OF|RAISE|INSTEAD|BEFORE|AFTER|\
+                    DEFERRABLE|INITIALLY|RESTRICT|CASCADE|ACTION)\\b
+                    """.replacingOccurrences(of: "\n", with: ""),
                     options: [.caseInsensitive]
                 )
                 string = try NSRegularExpression(pattern: "'(?:[^'\\\\]|\\\\.)*'", options: [])
                 number = try NSRegularExpression(pattern: "\\b\\d+\\.?\\d*\\b", options: [])
                 singleLineComment = try NSRegularExpression(pattern: "--.*", options: [])
                 multiLineComment = try NSRegularExpression(pattern: "/\\*[\\s\\S]*?\\*/", options: [.dotMatchesLineSeparators])
-                `operator` = try NSRegularExpression(pattern: "::|->>|->|@>|<@|\\?\\||\\?&|\\?|<=|>=|<>|!=|[=<>!+\\-*/%&|^~]", options: [])
+                // SQLite operators: || (concat), <<, >> (bitshift), standard comparison + arithmetic
+                `operator` = try NSRegularExpression(pattern: "\\|\\||<=|>=|<>|!=|<<|>>|[=<>!+\\-*/%&|^~]", options: [])
                 function = try NSRegularExpression(pattern: "\\b[A-Za-z_][A-Za-z0-9_]*\\s*\\(", options: [])
             } catch {
                 fatalError("Failed to compile regex patterns: \(error)")
