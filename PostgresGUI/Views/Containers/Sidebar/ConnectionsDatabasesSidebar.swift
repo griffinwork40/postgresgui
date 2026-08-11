@@ -249,6 +249,8 @@ struct ConnectionsDatabasesSidebar: View {
     }
 
     private func handleCreateDatabase() {
+        // TODO(sqlite): showCreateDatabase() / CreateDatabaseView is Postgres-only dead code for SQLite.
+        // Leave in place — removing it changes the picker interface.
         appState.navigation.showCreateDatabase()
     }
 
@@ -326,6 +328,10 @@ private struct RefreshToolbarButtonStyle: ButtonStyle {
 
 // MARK: - View Modifiers
 
+// TODO(sqlite): DatabaseAlertsModifier contains a "Delete Database" confirmation dialog that is
+// Postgres-only dead code. SQLite has no concept of dropping databases, and `databaseToDelete`
+// is never set for SQLite connections, so the dialog never appears. Leave in place for now;
+// remove when the Postgres connection path is fully retired.
 private struct DatabaseAlertsModifier: ViewModifier {
     @Binding var showConnectionError: Bool
     @Binding var connectionError: String?

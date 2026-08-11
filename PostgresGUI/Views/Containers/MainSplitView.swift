@@ -20,6 +20,14 @@ struct MainSplitView: View {
     @State private var viewModel: DetailContentViewModel?
     @State private var selectedQueryIDs: Set<SavedQuery.ID> = []
 
+    /// Window title: shows the SQLite filename when a file is open, or the Postgres database name.
+    private var navigationTitleText: String {
+        if let sqliteProfile = appState.connection.activeConnection?.sqliteProfile {
+            return sqliteProfile.displayName
+        }
+        return appState.connection.selectedDatabase?.name ?? ""
+    }
+
     var body: some View {
         @Bindable var appState = appState
 
@@ -91,7 +99,7 @@ struct MainSplitView: View {
                 }
             }
         }
-        .navigationTitle(appState.connection.selectedDatabase?.name ?? "")
+        .navigationTitle(navigationTitleText)
         .searchable(text: $searchText, prompt: "Filter results")
         .modifier(DetailContentModalsWrapper(viewModel: viewModel))
         .overlay(alignment: .bottomTrailing) {
