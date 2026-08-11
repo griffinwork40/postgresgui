@@ -25,11 +25,11 @@ final class SQLiteConnectionManagerTests: XCTestCase {
     // MARK: - Helpers
 
     /// Create a valid SQLite database file at the given path.
-    private func createTestDatabase(name: String = "test.db") throws -> String {
+    private func createTestDatabase(name: String = "test.db") async throws -> String {
         let path = tempDir.appendingPathComponent(name).path
         // Create via GRDB to ensure it's a valid SQLite file
         let queue = try DatabaseQueue(path: path)
-        try queue.write { db in
+        try await queue.write { db in
             try db.execute(sql: """
                 CREATE TABLE test (id INTEGER PRIMARY KEY, value TEXT);
                 INSERT INTO test VALUES (1, 'hello');
@@ -41,7 +41,7 @@ final class SQLiteConnectionManagerTests: XCTestCase {
     // MARK: - Connection Lifecycle
 
     func testConnectToValidDatabase() async throws {
-        let path = try createTestDatabase()
+        let path = try await createTestDatabase()
         let manager = SQLiteConnectionManager()
 
         try await manager.connect(filePath: path)
@@ -51,7 +51,7 @@ final class SQLiteConnectionManagerTests: XCTestCase {
     }
 
     func testDisconnect() async throws {
-        let path = try createTestDatabase()
+        let path = try await createTestDatabase()
         let manager = SQLiteConnectionManager()
 
         try await manager.connect(filePath: path)
@@ -62,8 +62,8 @@ final class SQLiteConnectionManagerTests: XCTestCase {
     }
 
     func testConnectReplacesExistingConnection() async throws {
-        let path1 = try createTestDatabase(name: "db1.sqlite")
-        let path2 = try createTestDatabase(name: "db2.sqlite")
+        let path1 = try await createTestDatabase(name: "db1.sqlite")
+        let path2 = try await createTestDatabase(name: "db2.sqlite")
         let manager = SQLiteConnectionManager()
 
         try await manager.connect(filePath: path1)
@@ -121,7 +121,7 @@ final class SQLiteConnectionManagerTests: XCTestCase {
     // MARK: - Database Operations
 
     func testWithDatabaseExecutesQuery() async throws {
-        let path = try createTestDatabase()
+        let path = try await createTestDatabase()
         let manager = SQLiteConnectionManager()
         try await manager.connect(filePath: path)
 

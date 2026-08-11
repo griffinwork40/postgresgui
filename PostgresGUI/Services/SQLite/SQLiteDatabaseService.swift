@@ -12,13 +12,11 @@
 
 import Foundation
 import GRDB
-import Logging
 
 @MainActor
 class SQLiteDatabaseService {
     private let connectionManager = SQLiteConnectionManager()
     private let queryExecutor = SQLiteQueryExecutor()
-    private let logger = Logger.debugLogger(label: "com.sqlitegui.service")
 
     // MARK: - Connection State
 
@@ -38,7 +36,7 @@ class SQLiteDatabaseService {
 
     /// Open a SQLite database file.
     func connect(filePath: String, readOnly: Bool = false) async throws {
-        logger.info("Opening: \(filePath)")
+        DebugLog.print("Opening: \(filePath)")
         _isConnected = false
         _currentFilePath = nil
 
@@ -46,12 +44,12 @@ class SQLiteDatabaseService {
 
         _currentFilePath = filePath
         _isConnected = true
-        logger.info("Connected to: \(filePath)")
+        DebugLog.print("Connected to: \(filePath)")
     }
 
     /// Close the current database.
     func disconnect() async {
-        logger.info("Disconnecting")
+        DebugLog.print("Disconnecting")
         await connectionManager.disconnect()
         _currentFilePath = nil
         _isConnected = false

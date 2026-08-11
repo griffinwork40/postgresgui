@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		EA1234560001000000000001 /* Citadel in Frameworks */ = {isa = PBXBuildFile; productRef = EA1234560001000000000002 /* Citadel */; };
-		EAC879F82EEB2A3B0085136E /* PostgresNIO in Frameworks */ = {isa = PBXBuildFile; productRef = EAC879F72EEB2A3B0085136E /* PostgresNIO */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,8 +55,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				EAC879F82EEB2A3B0085136E /* PostgresNIO in Frameworks */,
-				EA1234560001000000000001 /* Citadel in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -127,8 +123,6 @@
 			);
 			name = PostgresGUI;
 			packageProductDependencies = (
-				EAC879F72EEB2A3B0085136E /* PostgresNIO */,
-				EA1234560001000000000002 /* Citadel */,
 				EA5QL1TE0001000000000002 /* GRDB */,
 			);
 			productName = PostgresGUI;
@@ -215,8 +209,6 @@
 			mainGroup = EA3CC49F2EDA978C00DEE264;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				EAC879F62EEB2A3B0085136E /* XCRemoteSwiftPackageReference "postgres-nio" */,
-				EA1234560001000000000003 /* XCRemoteSwiftPackageReference "Citadel" */,
 				EA5QL1TE0001000000000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -621,22 +613,7 @@
 				minimumVersion = 7.0.0;
 			};
 		};
-		EA1234560001000000000003 /* XCRemoteSwiftPackageReference "Citadel" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/orlandos-nl/Citadel.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.7.0;
-			};
-		};
-		EAC879F62EEB2A3B0085136E /* XCRemoteSwiftPackageReference "postgres-nio" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/vapor/postgres-nio.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.29.0;
-			};
-		};
+
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -650,16 +627,7 @@
 			package = EA5QL1TE0001000000000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
 			productName = GRDB;
 		};
-		EA1234560001000000000002 /* Citadel */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = EA1234560001000000000003 /* XCRemoteSwiftPackageReference "Citadel" */;
-			productName = Citadel;
-		};
-		EAC879F72EEB2A3B0085136E /* PostgresNIO */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = EAC879F62EEB2A3B0085136E /* XCRemoteSwiftPackageReference "postgres-nio" */;
-			productName = PostgresNIO;
-		};
+
 /* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = EA3CC4A02EDA978C00DEE264 /* Project object */;

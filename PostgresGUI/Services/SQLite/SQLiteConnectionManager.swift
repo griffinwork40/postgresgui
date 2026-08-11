@@ -9,7 +9,6 @@
 
 import Foundation
 import GRDB
-import Logging
 
 actor SQLiteConnectionManager {
 
@@ -18,7 +17,6 @@ actor SQLiteConnectionManager {
     private var dbQueue: DatabaseQueue?
     private var currentFilePath: String?
     private var isReadOnlyMode: Bool = false
-    private let logger = Logger.debugLogger(label: "com.sqlitegui.connection")
 
     /// Generation counter to detect stale operations.
     private var connectionGeneration: UInt64 = 0
@@ -32,7 +30,7 @@ actor SQLiteConnectionManager {
     /// Open a SQLite database file.
     /// Does NOT automatically execute any PRAGMAs — the database is opened as-is.
     func connect(filePath: String, readOnly: Bool = false) async throws {
-        logger.info("Opening SQLite database: \(filePath), readOnly: \(readOnly)")
+        DebugLog.print("Opening SQLite database: \(filePath), readOnly: \(readOnly)")
 
         connectionGeneration &+= 1
         let myGeneration = connectionGeneration
@@ -53,7 +51,7 @@ actor SQLiteConnectionManager {
         }
 
         if !readOnly && !fileManager.isWritableFile(atPath: filePath) {
-            logger.info("File is not writable, opening in read-only mode")
+            DebugLog.print("File is not writable, opening in read-only mode")
         }
 
         var config = Configuration()
@@ -65,34 +63,34 @@ actor SQLiteConnectionManager {
             let queue = try DatabaseQueue(path: filePath, configuration: config)
 
             // Verify this is actually a SQLite database by executing a trivial query
-            try queue.read { db in
+            try await queue.read { db in
                 _ = try Int.fetchOne(db, sql: "SELECT 1")
             }
 
             guard connectionGeneration == myGeneration else {
-                logger.warning("Stale connection detected, discarding")
+                DebugLog.print("Stale connection detected, discarding")
                 return
             }
 
             self.dbQueue = queue
             self.currentFilePath = filePath
             self.isReadOnlyMode = readOnly
-            logger.info("Successfully opened SQLite database")
-        } catch let error as DatabaseError where error.resultCode == .SQLITE_NOTADB {
+            DebugLog.print("Successfully opened SQLite database")
+        } catch let error as GRDB.DatabaseError where error.resultCode == .SQLITE_NOTADB {
             throw FileOpenError.notADatabase(filePath)
-        } catch let error as DatabaseError where error.resultCode == .SQLITE_BUSY {
+        } catch let error as GRDB.DatabaseError where error.resultCode == .SQLITE_BUSY {
             throw FileOpenError.fileLocked(filePath)
-        } catch let error as DatabaseError where error.resultCode == .SQLITE_CANTOPEN {
+        } catch let error as GRDB.DatabaseError where error.resultCode == .SQLITE_CANTOPEN {
             throw FileOpenError.permissionDenied(filePath)
         } catch {
-            logger.error("Failed to open database: \(error)")
+            DebugLog.print("Failed to open database: \(error)")
             throw FileOpenError.unknownError(error.localizedDescription)
         }
     }
 
     /// Close the database connection.
     func disconnect() async {
-        logger.info("Closing SQLite database")
+        DebugLog.print("Closing SQLite database")
         // DatabaseQueue.close() is not needed — GRDB handles cleanup on dealloc.
         // Setting to nil releases the queue and closes the underlying sqlite3 handle.
         dbQueue = nil
@@ -118,7 +116,7 @@ actor SQLiteConnectionManager {
         guard let queue = dbQueue else {
             throw FileOpenError.notConnected
         }
-        return try queue.read { db in
+        return try await queue.read { db in
             try operation(db)
         }
     }
@@ -131,7 +129,7 @@ actor SQLiteConnectionManager {
         guard !isReadOnlyMode else {
             throw FileOpenError.unknownError("Database is opened in read-only mode")
         }
-        return try queue.write { db in
+        return try await queue.write { db in
             try operation(db)
         }
     }

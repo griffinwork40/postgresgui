@@ -543,12 +543,13 @@ struct ConnectionStateTests {
 
         private func makeProfile(name: String = "Test") -> ConnectionProfile {
             ConnectionProfile(
+                name: name,
                 host: "localhost",
                 port: 5432,
                 username: "user",
-                password: "pass",
                 database: name,
-                sslMode: .prefer
+                sslMode: .prefer,
+                password: "pass"
             )
         }
 

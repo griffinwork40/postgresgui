@@ -115,9 +115,4 @@ extension DatabaseServiceProtocol {
     func connectFile(filePath: String, readOnly: Bool) async throws {}
 }
 
-// MARK: - DatabaseService Conformance
 
-extension DatabaseService: DatabaseServiceProtocol {
-    // DatabaseService already implements all required methods
-    // No additional implementation needed
-}

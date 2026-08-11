@@ -41,7 +41,7 @@ class ConnectionState {
         set { activeConnection = newValue.map { .postgres($0) } }
     }
 
-    // Computed property - delegates to DatabaseService
+    // Computed property - delegates to DatabaseServiceProtocol
     var isConnected: Bool {
         databaseService.isConnected
     }
@@ -54,7 +54,7 @@ class ConnectionState {
     }
 
     convenience init() {
-        self.init(databaseService: DatabaseService())
+        self.init(databaseService: SQLiteDatabaseService())
     }
 
     // Current selections
@@ -76,7 +76,7 @@ class ConnectionState {
     // Key: table ID (schema.name), Value: whether columns are shown
     var expandedTables: Set<String> = []
 
-    // Data caches (populated by DatabaseService)
+    // Data caches (populated by the database service)
     var databases: [DatabaseInfo] = []
     var databasesVersion: Int = 0
     var schemas: [String] = []

@@ -16,7 +16,7 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     override func setUp() async throws {
         dbQueue = try DatabaseQueue()
-        try dbQueue.write { db in
+        try await dbQueue.write { db in
             try db.execute(sql: """
                 CREATE TABLE users (
                     id INTEGER PRIMARY KEY,
@@ -65,8 +65,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - Table Discovery
 
-    func testFetchTablesFindsUserTables() throws {
-        let tables = try dbQueue.read { db in
+    func testFetchTablesFindsUserTables() async throws {
+        let tables = try await dbQueue.read { db in
             try executor.fetchTables(db: db)
         }
 
@@ -78,8 +78,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         XCTAssertTrue(names.contains("active_users"))
     }
 
-    func testFetchTablesExcludesSQLiteInternals() throws {
-        let tables = try dbQueue.read { db in
+    func testFetchTablesExcludesSQLiteInternals() async throws {
+        let tables = try await dbQueue.read { db in
             try executor.fetchTables(db: db)
         }
 
@@ -87,8 +87,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         XCTAssertFalse(names.contains { $0.hasPrefix("sqlite_") })
     }
 
-    func testFetchTablesSchemaIsMain() throws {
-        let tables = try dbQueue.read { db in
+    func testFetchTablesSchemaIsMain() async throws {
+        let tables = try await dbQueue.read { db in
             try executor.fetchTables(db: db)
         }
 
@@ -99,8 +99,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - Column Metadata
 
-    func testFetchColumnsForUsers() throws {
-        let columns = try dbQueue.read { db in
+    func testFetchColumnsForUsers() async throws {
+        let columns = try await dbQueue.read { db in
             try executor.fetchColumns(db: db, table: "users")
         }
 
@@ -127,18 +127,18 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - Primary Keys
 
-    func testFetchPrimaryKeysForUsers() throws {
-        let pks = try dbQueue.read { db in
+    func testFetchPrimaryKeysForUsers() async throws {
+        let pks = try await dbQueue.read { db in
             try executor.fetchPrimaryKeys(db: db, table: "users")
         }
         XCTAssertEqual(pks, ["id"])
     }
 
-    func testFetchPrimaryKeysForTableWithoutExplicitPK() throws {
-        try dbQueue.write { db in
+    func testFetchPrimaryKeysForTableWithoutExplicitPK() async throws {
+        try await dbQueue.write { db in
             try db.execute(sql: "CREATE TABLE no_pk (a TEXT, b TEXT)")
         }
-        let pks = try dbQueue.read { db in
+        let pks = try await dbQueue.read { db in
             try executor.fetchPrimaryKeys(db: db, table: "no_pk")
         }
         XCTAssertTrue(pks.isEmpty)
@@ -146,8 +146,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - DDL Generation
 
-    func testGenerateDDL() throws {
-        let ddl = try dbQueue.read { db in
+    func testGenerateDDL() async throws {
+        let ddl = try await dbQueue.read { db in
             try executor.generateDDL(db: db, table: "users")
         }
         XCTAssertTrue(ddl.hasPrefix("CREATE TABLE users"))
@@ -155,8 +155,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         XCTAssertTrue(ddl.contains("name TEXT NOT NULL"))
     }
 
-    func testGenerateDDLForMissingTable() throws {
-        let ddl = try dbQueue.read { db in
+    func testGenerateDDLForMissingTable() async throws {
+        let ddl = try await dbQueue.read { db in
             try executor.generateDDL(db: db, table: "nonexistent")
         }
         XCTAssertTrue(ddl.contains("No DDL found"))
@@ -164,8 +164,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - Typed Data Fetching
 
-    func testFetchTableDataReturnsTypedValues() throws {
-        let result = try dbQueue.read { db in
+    func testFetchTableDataReturnsTypedValues() async throws {
+        let result = try await dbQueue.read { db in
             try executor.fetchTableData(db: db, table: "users", limit: 10, offset: 0)
         }
 
@@ -193,8 +193,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         XCTAssertEqual(alice[scoreIndex], .real(95.5))
     }
 
-    func testNullValuesPreserved() throws {
-        let result = try dbQueue.read { db in
+    func testNullValuesPreserved() async throws {
+        let result = try await dbQueue.read { db in
             try executor.fetchTableData(db: db, table: "users", limit: 10, offset: 0)
         }
 
@@ -207,8 +207,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         XCTAssertEqual(bob[dataIndex], .null)
     }
 
-    func testBlobValuesPreserved() throws {
-        let result = try dbQueue.read { db in
+    func testBlobValuesPreserved() async throws {
+        let result = try await dbQueue.read { db in
             try executor.fetchTableData(db: db, table: "users", limit: 10, offset: 0)
         }
 
@@ -224,15 +224,15 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - Pagination
 
-    func testPaginationLimit() throws {
-        let result = try dbQueue.read { db in
+    func testPaginationLimit() async throws {
+        let result = try await dbQueue.read { db in
             try executor.fetchTableData(db: db, table: "users", limit: 2, offset: 0)
         }
         XCTAssertEqual(result.rows.count, 2)
     }
 
-    func testPaginationOffset() throws {
-        let result = try dbQueue.read { db in
+    func testPaginationOffset() async throws {
+        let result = try await dbQueue.read { db in
             try executor.fetchTableData(db: db, table: "users", limit: 10, offset: 2)
         }
         XCTAssertEqual(result.rows.count, 1)  // Only Charlie
@@ -243,8 +243,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - Arbitrary SQL Execution
 
-    func testExecuteSelectQuery() throws {
-        let result = try dbQueue.read { db in
+    func testExecuteSelectQuery() async throws {
+        let result = try await dbQueue.read { db in
             try executor.executeQuery(db: db, sql: "SELECT name, score FROM users WHERE score > 90")
         }
         XCTAssertTrue(result.isSuccess)
@@ -254,8 +254,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         XCTAssertEqual(result.rows[0][1], .real(95.5))
     }
 
-    func testExecuteSelectWithDuplicateColumnNames() throws {
-        let result = try dbQueue.read { db in
+    func testExecuteSelectWithDuplicateColumnNames() async throws {
+        let result = try await dbQueue.read { db in
             try executor.executeQuery(
                 db: db,
                 sql: "SELECT u.id, o.id FROM users u JOIN orders o ON u.id = o.user_id LIMIT 1"
@@ -274,8 +274,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         }
     }
 
-    func testExecuteExpressionQuery() throws {
-        let result = try dbQueue.read { db in
+    func testExecuteExpressionQuery() async throws {
+        let result = try await dbQueue.read { db in
             try executor.executeQuery(db: db, sql: "SELECT 1 + 1 AS result, typeof(1) AS type")
         }
         XCTAssertTrue(result.isSuccess)
@@ -283,8 +283,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
         XCTAssertEqual(result.rows[0][1], .text("integer"))
     }
 
-    func testExecuteCountQuery() throws {
-        let result = try dbQueue.read { db in
+    func testExecuteCountQuery() async throws {
+        let result = try await dbQueue.read { db in
             try executor.executeQuery(db: db, sql: "SELECT COUNT(*) AS cnt FROM users")
         }
         XCTAssertTrue(result.isSuccess)
@@ -293,8 +293,8 @@ final class SQLiteQueryExecutorTests: XCTestCase {
 
     // MARK: - Display Conversion
 
-    func testToDisplayRowsPreservesAllTypes() throws {
-        let result = try dbQueue.read { db in
+    func testToDisplayRowsPreservesAllTypes() async throws {
+        let result = try await dbQueue.read { db in
             try executor.fetchTableData(db: db, table: "users", limit: 1, offset: 2)
         }
         let displayRows = result.toDisplayRows()

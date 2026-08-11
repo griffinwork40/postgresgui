@@ -9,11 +9,8 @@
 
 import Foundation
 import GRDB
-import Logging
 
 struct SQLiteQueryExecutor {
-
-    private let logger = Logger.debugLogger(label: "com.sqlitegui.query")
 
     // MARK: - Table Discovery
 
@@ -47,7 +44,7 @@ struct SQLiteQueryExecutor {
             ))
         }
 
-        logger.info("Fetched \(tables.count) tables/views")
+        DebugLog.print("Fetched \(tables.count) tables/views")
         return tables
     }
 
@@ -79,7 +76,7 @@ struct SQLiteQueryExecutor {
             ))
         }
 
-        logger.info("Fetched \(columns.count) columns for \(table)")
+        DebugLog.print("Fetched \(columns.count) columns for \(table)")
         return columns
     }
 
@@ -99,7 +96,7 @@ struct SQLiteQueryExecutor {
         // Sort by pk index (composite keys are ordered)
         pkColumns.sort { $0.pkIndex < $1.pkIndex }
 
-        logger.info("Found \(pkColumns.count) primary key columns for \(table)")
+        DebugLog.print("Found \(pkColumns.count) primary key columns for \(table)")
         return pkColumns.map(\.name)
     }
 
@@ -193,7 +190,7 @@ struct SQLiteQueryExecutor {
         }
 
         let duration = Date().timeIntervalSince(startTime)
-        logger.info("SELECT returned \(resultRows.count) rows in \(String(format: "%.3f", duration))s")
+        DebugLog.print("SELECT returned \(resultRows.count) rows in \(String(format: "%.3f", duration))s")
 
         return TypedQueryResult.success(
             columns: columns,

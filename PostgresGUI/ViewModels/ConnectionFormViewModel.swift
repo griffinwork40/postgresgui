@@ -2,7 +2,8 @@
 //  ConnectionFormViewModel.swift
 //  PostgresGUI
 //
-//  Created by ghazi on 12/17/25.
+//  ViewModel for ConnectionFormView — handles business logic and state.
+//  SSH and PostgreSQL-specific logic removed; retained for any future use.
 //
 
 import Foundation
@@ -16,7 +17,7 @@ enum ConnectionInputMode {
     case connectionString
 }
 
-/// ViewModel for ConnectionFormView - handles all business logic and state
+/// ViewModel for ConnectionFormView — handles all business logic and state
 @Observable
 @MainActor
 class ConnectionFormViewModel {
@@ -64,7 +65,7 @@ class ConnectionFormViewModel {
     var actualStoredPassword: String = ""
     var passwordModified: Bool = false
 
-    // MARK: - SSH Tunnel State
+    // MARK: - SSH Tunnel State (retained for UI compatibility; SSH is not functional in this build)
 
     var sshEnabled: Bool = false
     var sshHost: String = ""
@@ -78,7 +79,6 @@ class ConnectionFormViewModel {
     var sshPassphrase: String = ""
     var showSSHPassphrase: Bool = false
 
-    // SSH password management (mirrors DB password pattern)
     var hasStoredSSHPassword: Bool = false
     var actualStoredSSHPassword: String = ""
     var sshPasswordModified: Bool = false
@@ -134,7 +134,6 @@ class ConnectionFormViewModel {
     func loadConnectionIfNeeded() {
         guard let connection = connectionToEdit else { return }
 
-        // Populate both name fields with the same value initially
         individualName = connection.name ?? ""
         connectionStringName = connection.name ?? ""
         host = connection.host
@@ -142,17 +141,15 @@ class ConnectionFormViewModel {
         username = connection.username
         database = connection.database
 
-        // Password handling - don't access keychain on form load
         hasStoredPassword = true
         actualStoredPassword = ""
         passwordModified = false
         password = String(repeating: "•", count: 8)
 
-        // Show name fields when editing only if name is not nil
         showIndividualNameField = connection.name != nil
         showConnectionStringNameField = connection.name != nil
 
-        // SSH tunnel fields
+        // Restore SSH fields (UI only; SSH is not functional)
         sshEnabled = connection.sshEnabled
         sshHost = connection.sshHost ?? ""
         sshPort = connection.sshPort.map { String($0) } ?? "22"
@@ -160,26 +157,9 @@ class ConnectionFormViewModel {
         sshAuthMethod = connection.sshAuthMethodEnum
         sshPrivateKeyPath = connection.sshPrivateKeyPath ?? ""
 
-        // SSH password/passphrase — lazy load from Keychain (same pattern as DB password)
-        if sshEnabled {
-            if sshAuthMethod == .password {
-                hasStoredSSHPassword = true
-                actualStoredSSHPassword = ""
-                sshPasswordModified = false
-                sshPassword = String(repeating: "\u{2022}", count: 8)
-            } else {
-                hasStoredSSHPassphrase = true
-                actualStoredSSHPassphrase = ""
-                sshPassphraseModified = false
-                sshPassphrase = String(repeating: "\u{2022}", count: 8)
-            }
-        }
-
-        // If in connection string mode, populate the connection string
         if inputMode == .connectionString {
             connectionString = generateConnectionString()
         }
-
     }
 
     // MARK: - Input Mode Handling
@@ -187,7 +167,6 @@ class ConnectionFormViewModel {
     func handleInputModeChange(to newMode: ConnectionInputMode) {
         connectionTestStatus = .idle
 
-        // If switching to connection string mode in edit mode, populate the connection string
         if newMode == .connectionString, isEditing {
             connectionString = generateConnectionString()
         }
@@ -201,7 +180,6 @@ class ConnectionFormViewModel {
 
     // MARK: - Password Handling
 
-    /// Load password from keychain when user clicks "Show Password"
     func loadPasswordFromKeychain() -> Bool {
         guard let connection = connectionToEdit else { return true }
 
@@ -215,13 +193,12 @@ class ConnectionFormViewModel {
             }
         } catch {
             connectionTestStatus = .error(
-                message: "Unable to retrieve password from keychain. You may need to grant access in System Settings > Privacy & Security."
+                message: "Unable to retrieve password from keychain."
             )
             return false
         }
     }
 
-    /// Get the actual password value for connection
     func getActualPassword() -> String {
         if let connection = connectionToEdit {
             if hasStoredPassword && !passwordModified {
@@ -231,7 +208,6 @@ class ConnectionFormViewModel {
         return password
     }
 
-    /// Handle password field change
     func handlePasswordChange(_ newValue: String) {
         password = newValue
         if hasStoredPassword && !passwordModified {
@@ -270,99 +246,11 @@ class ConnectionFormViewModel {
 
     // MARK: - Connection Testing
 
+    /// Not supported in the SQLite-only build.
     func testConnection() async {
-        isConnecting = true
-
-        let testStartTime = Date()
-        connectionTestStatus = .testing
-
-        DebugLog.print("🧪 [ConnectionFormViewModel] ========== Starting Connection Test ==========")
-        DebugLog.print("   Mode: \(inputMode == .connectionString ? "Connection String" : "Individual Fields")")
-
-        var tunnelManager: SSHTunnelManager?
-        do {
-            let details = try parseConnectionDetails()
-
-            DebugLog.print("   Final connection parameters:")
-            DebugLog.print("     Host: \(details.host)")
-            DebugLog.print("     Port: \(details.port)")
-            DebugLog.print("     Username: \(details.username)")
-            DebugLog.print("     Database: \(details.database)")
-            DebugLog.print("     SSL Mode: \(details.sslMode.rawValue)")
-            DebugLog.print("     SSH Tunnel: \(details.sshConfig != nil ? "enabled" : "disabled")")
-
-            var testHost = details.host
-            var testPort = details.port
-
-            // If SSH tunnel is configured, establish it first
-            if let sshConfig = details.sshConfig {
-                connectionTestStatus = .testingSSH
-                DebugLog.print("   🔒 Establishing SSH tunnel to \(sshConfig.sshHost):\(sshConfig.sshPort)")
-
-                let manager = SSHTunnelManager()
-                tunnelManager = manager
-                do {
-                    let localPort = try await manager.establish(config: sshConfig)
-                    testHost = "127.0.0.1"
-                    testPort = localPort
-                    DebugLog.print("   🔒 SSH tunnel established on port \(localPort)")
-                    connectionTestStatus = .testing
-                } catch {
-                    await manager.teardown()
-                    let message = "SSH tunnel failed: \(error.localizedDescription)"
-                    await handleTestError(message, startTime: testStartTime)
-                    isConnecting = false
-                    return
-                }
-            }
-
-            let success = try await DatabaseService.testConnection(
-                host: testHost,
-                port: testPort,
-                username: details.username,
-                password: details.password,
-                database: details.database,
-                sslMode: details.sslMode
-            )
-
-            // Tear down test tunnel
-            if let manager = tunnelManager {
-                await manager.teardown()
-            }
-
-            // Ensure testing state is visible for at least 150ms
-            let elapsed = Date().timeIntervalSince(testStartTime)
-            if elapsed < 0.15 {
-                try? await Task.sleep(nanoseconds: (0.15 - elapsed).nanoseconds)
-            }
-
-            if success {
-                DebugLog.print("   ✅ Connection test successful!")
-                connectionTestStatus = .success
-            } else {
-                DebugLog.print("   ❌ Connection test failed (returned false)")
-                let prefix = details.sshConfig != nil ? "SSH tunnel established, but database connection failed: " : ""
-                connectionTestStatus = .error(message: "\(prefix)Could not connect to \(details.host):\(details.port)")
-            }
-        } catch let error as ConnectionFormError {
-            if let manager = tunnelManager { await manager.teardown() }
-            await handleTestError(error.message, startTime: testStartTime)
-        } catch {
-            if let manager = tunnelManager { await manager.teardown() }
-            let message = PostgresError.extractDetailedMessage(error)
-            await handleTestError(message, startTime: testStartTime)
-        }
-
-        isConnecting = false
-    }
-
-    private func handleTestError(_ message: String, startTime: Date) async {
-        let elapsed = Date().timeIntervalSince(startTime)
-        if elapsed < 0.15 {
-            try? await Task.sleep(nanoseconds: (0.15 - elapsed).nanoseconds)
-        }
-        connectionTestStatus = .error(message: message)
-        DebugLog.print("   ❌ \(message)")
+        connectionTestStatus = .error(
+            message: "Connection testing is not available in this build."
+        )
     }
 
     // MARK: - Save Connection
@@ -376,17 +264,14 @@ class ConnectionFormViewModel {
             let profile: ConnectionProfile
 
             if let existingConnection = connectionToEdit {
-                // Update existing connection
                 profile = existingConnection
 
-                // Check if connection-critical parameters changed (requires reconnect)
                 let connectionParamsChanged = profile.host != details.host ||
                     profile.port != details.port ||
                     profile.username != details.username ||
                     profile.database != details.database ||
                     profile.sslMode != details.sslMode.rawValue ||
-                    passwordModified ||
-                    profile.sshEnabled != sshEnabled
+                    passwordModified
 
                 profile.name = currentName
                 profile.host = details.host
@@ -395,15 +280,6 @@ class ConnectionFormViewModel {
                 profile.database = details.database
                 profile.sslMode = details.sslMode.rawValue
 
-                // Update SSH tunnel fields
-                profile.sshEnabled = sshEnabled
-                profile.sshHost = sshEnabled ? sshHost : nil
-                profile.sshPort = sshEnabled ? (Int(sshPort) ?? 22) : nil
-                profile.sshUsername = sshEnabled ? sshUsername : nil
-                profile.sshAuthMethod = sshEnabled ? sshAuthMethod.rawValue : nil
-                profile.sshPrivateKeyPath = (sshEnabled && sshAuthMethod == .privateKey) ? sshPrivateKeyPath : nil
-
-                // Update password if modified
                 if passwordModified {
                     if !password.isEmpty {
                         try keychainService.savePassword(password, for: profile.id)
@@ -412,14 +288,8 @@ class ConnectionFormViewModel {
                     }
                 }
 
-                // Update SSH credentials
-                try saveSSHCredentials(for: profile.id)
-
-                // Save changes to SwiftData
                 try modelContext.save()
 
-                // Only disconnect if connection-critical parameters changed
-                // (name-only changes don't require reconnection)
                 if connectionParamsChanged && appState.connection.currentConnection?.id == profile.id {
                     await appState.connection.databaseService.disconnect()
                     appState.connection.currentConnection = nil
@@ -430,7 +300,6 @@ class ConnectionFormViewModel {
                     appState.connection.databasesVersion += 1
                 }
             } else {
-                // Create new connection
                 profile = ConnectionProfile(
                     name: currentName,
                     host: details.host,
@@ -438,38 +307,27 @@ class ConnectionFormViewModel {
                     username: details.username,
                     database: details.database,
                     sslMode: details.sslMode,
-                    password: nil,
-                    sshEnabled: sshEnabled,
-                    sshHost: sshEnabled ? sshHost : nil,
-                    sshPort: sshEnabled ? (Int(sshPort) ?? 22) : nil,
-                    sshUsername: sshEnabled ? sshUsername : nil,
-                    sshAuthMethod: sshEnabled ? sshAuthMethod : nil,
-                    sshPrivateKeyPath: (sshEnabled && sshAuthMethod == .privateKey) ? sshPrivateKeyPath : nil
+                    password: nil
                 )
 
-                // Save password to keychain
                 if !details.password.isEmpty {
                     try keychainService.savePassword(details.password, for: profile.id)
                 }
 
-                // Save SSH credentials
-                try saveSSHCredentials(for: profile.id)
-
                 modelContext.insert(profile)
                 try modelContext.save()
 
-                // Auto-connect if first connection, otherwise show alert
                 let descriptor = FetchDescriptor<ConnectionProfile>()
                 let allConnections = try modelContext.fetch(descriptor)
 
                 if allConnections.count == 1 {
                     await autoConnect(to: profile, password: details.password)
                 } else {
-                    // Show connection saved alert with Connect/Dismiss options
                     savedConnectionProfile = profile
                     savedConnectionPassword = details.password
                     showConnectionSavedAlert = true
-                    return false  // Don't dismiss yet - wait for alert response
+                    isConnecting = false
+                    return false
                 }
             }
 
@@ -511,14 +369,12 @@ class ConnectionFormViewModel {
         }
     }
 
-    /// Called when user chooses to connect from the "Connection Saved" alert
     func connectToSavedConnection() async {
         guard let profile = savedConnectionProfile else { return }
         await autoConnect(to: profile, password: savedConnectionPassword)
         clearSavedConnectionState()
     }
 
-    /// Called when user chooses "Not Now" from the "Connection Saved" alert
     func dismissSavedConnectionAlert() {
         clearSavedConnectionState()
     }
@@ -538,7 +394,6 @@ class ConnectionFormViewModel {
         let password: String
         let database: String
         let sslMode: SSLMode
-        let sshConfig: SSHTunnelConfig?
     }
 
     private func parseConnectionDetails() throws -> ConnectionDetails {
@@ -554,7 +409,6 @@ class ConnectionFormViewModel {
 
         var parsedPassword = parsed.password ?? ""
 
-        // Replace YOUR_PASSWORD placeholder with keychain password
         if let connection = connectionToEdit, parsedPassword == "YOUR_PASSWORD" {
             if let keychainPassword = try? keychainService.getPassword(for: connection.id), !keychainPassword.isEmpty {
                 parsedPassword = keychainPassword
@@ -567,11 +421,7 @@ class ConnectionFormViewModel {
             username: parsed.username ?? Constants.PostgreSQL.defaultUsername,
             password: parsedPassword,
             database: parsed.database ?? Constants.PostgreSQL.defaultDatabase,
-            sslMode: parsed.sslMode,
-            sshConfig: buildSSHConfig(
-                dbHost: parsed.host,
-                dbPort: parsed.port
-            )
+            sslMode: parsed.sslMode
         )
     }
 
@@ -604,131 +454,8 @@ class ConnectionFormViewModel {
             username: trimmedUsername.isEmpty ? "postgres" : trimmedUsername,
             password: passwordToUse,
             database: trimmedDatabase.isEmpty ? "postgres" : trimmedDatabase,
-            sslMode: sslModeSelection,
-            sshConfig: buildSSHConfig(dbHost: finalHost, dbPort: portInt)
+            sslMode: sslModeSelection
         )
-    }
-
-    // MARK: - SSH Tunnel Helpers
-
-    /// Build SSH tunnel config from current form state, or nil if SSH is disabled
-    private func buildSSHConfig(dbHost: String, dbPort: Int) -> SSHTunnelConfig? {
-        guard sshEnabled else { return nil }
-
-        let sshPasswordToUse: String?
-        let sshPassphraseToUse: String?
-
-        if sshAuthMethod == .password {
-            if let connection = connectionToEdit, hasStoredSSHPassword, !sshPasswordModified {
-                sshPasswordToUse = (try? keychainService.getSSHPassword(for: connection.id)) ?? ""
-            } else {
-                sshPasswordToUse = sshPassword
-            }
-            sshPassphraseToUse = nil
-        } else {
-            sshPasswordToUse = nil
-            if let connection = connectionToEdit, hasStoredSSHPassphrase, !sshPassphraseModified {
-                sshPassphraseToUse = (try? keychainService.getSSHPassphrase(for: connection.id)) ?? ""
-            } else {
-                sshPassphraseToUse = sshPassphrase.isEmpty ? nil : sshPassphrase
-            }
-        }
-
-        // Get private key content: from form state (just browsed) or from Keychain (editing)
-        let privateKeyContentToUse: String?
-        if sshAuthMethod == .privateKey {
-            if !sshPrivateKeyContent.isEmpty {
-                privateKeyContentToUse = sshPrivateKeyContent
-            } else if let connection = connectionToEdit {
-                privateKeyContentToUse = try? keychainService.getSSHPrivateKey(for: connection.id)
-            } else {
-                privateKeyContentToUse = nil
-            }
-        } else {
-            privateKeyContentToUse = nil
-        }
-
-        return SSHTunnelConfig(
-            sshHost: sshHost.trimmingCharacters(in: .whitespacesAndNewlines),
-            sshPort: Int(sshPort.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 22,
-            sshUsername: sshUsername.trimmingCharacters(in: .whitespacesAndNewlines),
-            authMethod: sshAuthMethod,
-            password: sshPasswordToUse,
-            privateKeyPath: sshAuthMethod == .privateKey ? sshPrivateKeyPath : nil,
-            privateKeyContent: privateKeyContentToUse,
-            passphrase: sshPassphraseToUse,
-            remoteHost: dbHost,
-            remotePort: dbPort
-        )
-    }
-
-    /// Open file picker for SSH private key
-    func browseForPrivateKey() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".ssh")
-        panel.message = "Select SSH Private Key"
-        panel.begin { [weak self] response in
-            if response == .OK, let url = panel.url {
-                Task { @MainActor in
-                    self?.sshPrivateKeyPath = url.path
-                    // Read file contents now while sandbox access is active
-                    if let content = try? String(contentsOf: url, encoding: .utf8) {
-                        self?.sshPrivateKeyContent = content
-                    }
-                }
-            }
-        }
-    }
-
-    /// Handle SSH password field change
-    func handleSSHPasswordChange(_ newValue: String) {
-        sshPassword = newValue
-        if hasStoredSSHPassword && !sshPasswordModified {
-            sshPasswordModified = true
-        }
-    }
-
-    /// Handle SSH passphrase field change
-    func handleSSHPassphraseChange(_ newValue: String) {
-        sshPassphrase = newValue
-        if hasStoredSSHPassphrase && !sshPassphraseModified {
-            sshPassphraseModified = true
-        }
-    }
-
-    /// Load SSH password from keychain when user clicks "Show"
-    func loadSSHPasswordFromKeychain() -> Bool {
-        guard let connection = connectionToEdit else { return true }
-        do {
-            if let stored = try keychainService.getSSHPassword(for: connection.id) {
-                actualStoredSSHPassword = stored
-            }
-            return true
-        } catch {
-            connectionTestStatus = .error(
-                message: "Unable to retrieve SSH password from keychain."
-            )
-            return false
-        }
-    }
-
-    /// Load SSH passphrase from keychain when user clicks "Show"
-    func loadSSHPassphraseFromKeychain() -> Bool {
-        guard let connection = connectionToEdit else { return true }
-        do {
-            if let stored = try keychainService.getSSHPassphrase(for: connection.id) {
-                actualStoredSSHPassphrase = stored
-            }
-            return true
-        } catch {
-            connectionTestStatus = .error(
-                message: "Unable to retrieve SSH passphrase from keychain."
-            )
-            return false
-        }
     }
 
     // MARK: - SSL Mode Handling
@@ -758,41 +485,27 @@ class ConnectionFormViewModel {
         sslModeSelection = SSLMode.defaultFor(host: trimmedHost)
     }
 
-    // MARK: - SSH Credential Persistence
+    // MARK: - SSH Stub Methods (UI compatibility; SSH is not functional in this build)
 
-    private func saveSSHCredentials(for connectionId: UUID) throws {
-        if sshEnabled {
-            if sshAuthMethod == .password {
-                if !isEditing || sshPasswordModified {
-                    if !sshPassword.isEmpty {
-                        try keychainService.saveSSHPassword(sshPassword, for: connectionId)
-                    } else {
-                        try? keychainService.deleteSSHPassword(for: connectionId)
-                    }
-                }
-                // Clean up passphrase if switching from privateKey to password
-                try? keychainService.deleteSSHPassphrase(for: connectionId)
-            } else {
-                if !isEditing || sshPassphraseModified {
-                    if !sshPassphrase.isEmpty {
-                        try keychainService.saveSSHPassphrase(sshPassphrase, for: connectionId)
-                    } else {
-                        try? keychainService.deleteSSHPassphrase(for: connectionId)
-                    }
-                }
-                // Save private key content to Keychain
-                if !sshPrivateKeyContent.isEmpty {
-                    try keychainService.saveSSHPrivateKey(sshPrivateKeyContent, for: connectionId)
-                }
-                // Clean up password if switching from password to privateKey
-                try? keychainService.deleteSSHPassword(for: connectionId)
-            }
-        } else {
-            // SSH disabled — clean up any SSH credentials
-            try? keychainService.deleteSSHPassword(for: connectionId)
-            try? keychainService.deleteSSHPassphrase(for: connectionId)
-            try? keychainService.deleteSSHPrivateKey(for: connectionId)
-        }
+    func handleSSHPasswordChange(_ newValue: String) {
+        sshPassword = newValue
+        if hasStoredSSHPassword && !sshPasswordModified { sshPasswordModified = true }
+    }
+
+    func handleSSHPassphraseChange(_ newValue: String) {
+        sshPassphrase = newValue
+        if hasStoredSSHPassphrase && !sshPassphraseModified { sshPassphraseModified = true }
+    }
+
+    func loadSSHPasswordFromKeychain() -> Bool { true }
+    func loadSSHPassphraseFromKeychain() -> Bool { true }
+
+    func browseForPrivateKey() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.begin { _ in }
     }
 }
 
