@@ -548,6 +548,8 @@ class AppState {
     /// Use `setSchemaSearchPathDebounced` for tab switches and user-initiated schema changes
     @MainActor
     func setSchemaSearchPath(_ schema: String?) async {
+        // SQLite has no search_path concept — skip for file-based connections
+        if case .sqlite = connection.activeConnection { return }
         guard connection.isConnected else { return }
 
         // Build search_path: selected schema first, then public as fallback
