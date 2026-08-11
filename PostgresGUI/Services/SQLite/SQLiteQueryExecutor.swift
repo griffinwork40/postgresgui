@@ -34,7 +34,10 @@ struct SQLiteQueryExecutor {
 
             // Detect virtual tables (FTS, etc.) from CREATE VIRTUAL TABLE statement
             let isVirtual = createSQL?.uppercased().hasPrefix("CREATE VIRTUAL TABLE") ?? false
-            let tableType: TableType = isVirtual ? .regular : (type == "view" ? .regular : .regular)
+            // Virtual tables (FTS5, rtree, etc.) are exposed as regular tables.
+            // sqlite_schema type "view" maps to .view; all other entries (including virtual) are .regular.
+            let tableType: TableType = type == "view" ? .view : .regular
+            _ = isVirtual  // retained for future use (e.g. filtering or display hints)
 
             // Use "main" as the schema for SQLite's default database
             tables.append(TableInfo(

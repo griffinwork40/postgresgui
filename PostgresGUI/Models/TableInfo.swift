@@ -10,6 +10,7 @@ import Foundation
 enum TableType: String {
     case regular
     case foreign
+    case view
 }
 
 struct TableInfo: Identifiable {
@@ -29,9 +30,10 @@ struct TableInfo: Identifiable {
         self.columnInfo = columnInfo
     }
 
-    /// Display name showing schema prefix for non-public schemas
+    /// Display name showing schema prefix for non-default schemas.
+    /// Both "public" (Postgres) and "main" (SQLite) are treated as default schemas.
     var displayName: String {
-        if schema == "public" {
+        if schema == "public" || schema == "main" {
             return name
         } else {
             return "\(schema).\(name)"
