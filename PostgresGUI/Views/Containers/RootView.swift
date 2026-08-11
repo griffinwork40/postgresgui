@@ -25,7 +25,6 @@ struct RootView: View {
             Group {
                 if shouldShowWelcomeScreen(
                     connectionCount: connections.count,
-                    isShowingConnectionForm: appState.navigation.isShowingConnectionForm,
                     fileProfileCount: fileProfiles.count
                 ) {
                     WelcomeView()
@@ -42,18 +41,8 @@ struct RootView: View {
         }
         .environment(tabManager)
         .environment(loadingState)
-        .sheet(isPresented: Binding(
-            get: { appState.navigation.isShowingConnectionForm },
-            set: { newValue in
-                appState.navigation.isShowingConnectionForm = newValue
-                if !newValue {
-                    appState.navigation.connectionToEdit = nil
-                }
-            }
-        )) {
-            ConnectionFormView(connectionToEdit: appState.navigation.connectionToEdit)
-                .environment(appState)
-        }
+        // NOTE: ConnectionFormView sheet removed — this is a SQLite-only app.
+        //       The Postgres connection form (ConnectionFormView/ConnectionFormViewModel) was deleted.
         .sheet(isPresented: Binding(
             get: { appState.navigation.isShowingCreateDatabase },
             set: { appState.navigation.isShowingCreateDatabase = $0 }

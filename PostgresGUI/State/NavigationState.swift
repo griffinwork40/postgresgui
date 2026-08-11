@@ -15,18 +15,14 @@ class NavigationState {
     var navigationPath: NavigationPath = NavigationPath()
 
     // Modal/Sheet state
-    var isShowingConnectionForm: Bool = false
-    var connectionToEdit: ConnectionProfile? = nil
+    // NOTE: isShowingConnectionForm / connectionToEdit removed — this is a SQLite-only app;
+    //       the Postgres connection form (ConnectionFormView) has been deleted.
     var isShowingCreateDatabase: Bool = false
     var isShowingKeyboardShortcuts: Bool = false
     var isShowingHelp: Bool = false
     var isShowingFileOpen: Bool = false
 
     // Sheet management helpers
-    func showConnectionForm() {
-        isShowingConnectionForm = true
-    }
-
     func showCreateDatabase() {
         isShowingCreateDatabase = true
     }

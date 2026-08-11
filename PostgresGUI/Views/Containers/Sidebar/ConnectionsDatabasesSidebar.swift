@@ -227,8 +227,8 @@ struct ConnectionsDatabasesSidebar: View {
     }
 
     private func handleEditConnection(_ connection: ConnectionProfile) {
-        appState.navigation.connectionToEdit = connection
-        appState.showConnectionForm()
+        // TODO: SQLite-only build — Postgres connection editing is not available.
+        // ConnectionFormView was removed. Wire to a future SQLite profile editor if needed.
     }
 
     private func handleDeleteConnection(_ connection: ConnectionProfile) {
@@ -236,8 +236,8 @@ struct ConnectionsDatabasesSidebar: View {
     }
 
     private func handleCreateConnection() {
-        appState.navigation.connectionToEdit = nil
-        appState.showConnectionForm()
+        // TODO: SQLite-only build — Postgres connection creation is not available.
+        // ConnectionFormView was removed. Use FileOpenView (showFileOpen) for SQLite files.
     }
 
     private func handleSelectDatabase(_ database: DatabaseInfo) {

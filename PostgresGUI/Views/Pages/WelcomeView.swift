@@ -22,20 +22,6 @@ struct WelcomeView: View {
                 .foregroundStyle(.secondary)
                 .accessibilityIdentifier("welcomeText")
             
-            Button(action: showConnectionForm) {
-                HStack {
-                    Text("Connect to Server...")
-                    Spacer()
-                    Image(systemName: "server.rack")
-                }
-                .frame(minWidth: 160, maxWidth: 200)
-                .padding(.vertical, 6)
-            }
-            .buttonStyle(.glass)
-            .tint(.primary)
-            .controlSize(.large)
-            .accessibilityIdentifier("connectToServerButton")
-
             Button(action: showFileOpen) {
                 HStack {
                     Text("Open SQLite Database...")
@@ -56,10 +42,6 @@ struct WelcomeView: View {
         .padding(.bottom, 24)
     }
     
-    private func showConnectionForm() {
-        appState.showConnectionForm()
-    }
-
     private func showFileOpen() {
         appState.showFileOpen()
     }

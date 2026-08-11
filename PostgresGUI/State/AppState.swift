@@ -48,10 +48,6 @@ class AppState {
 
     // MARK: - Convenience Methods
 
-    func showConnectionForm() {
-        navigation.showConnectionForm()
-    }
-
     func showFileOpen() {
         navigation.showFileOpen()
     }

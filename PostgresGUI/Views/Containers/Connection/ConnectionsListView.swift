@@ -63,13 +63,13 @@ struct ConnectionsListView: View {
                         .fontWeight(.semibold)
                     Spacer()
 
-                    Button {
-                        appState.navigation.connectionToEdit = nil
-                        appState.showConnectionForm()
-                    } label: {
+                    // TODO: SQLite-only build — Postgres new-connection form removed.
+                    // Button intentionally disabled; use FileOpenView to open SQLite databases.
+                    Button {} label: {
                         Label("New Connection", systemImage: "plus")
                     }
                     .buttonStyle(.borderless)
+                    .disabled(true)
                 }
                 .padding()
 
@@ -96,8 +96,7 @@ struct ConnectionsListView: View {
                                     }
                                 },
                                 onEdit: {
-                                    appState.navigation.connectionToEdit = connection
-                                    appState.showConnectionForm()
+                                    // TODO: SQLite-only build — Postgres connection editing removed.
                                 },
                                 onDelete: {
                                     vm.connectionToDelete = connection
