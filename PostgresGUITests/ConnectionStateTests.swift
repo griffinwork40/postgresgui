@@ -478,6 +478,27 @@ struct ConnectionStateTests {
             )
             #expect(result == true)
         }
+
+        /// When a SQLite file is open, `currentConnection` (Postgres) is nil and
+        /// queries are issued with `connectionId: nil`. The context should be valid.
+        @Test func returnsTrueWhenActiveConnectionIsSQLite() {
+            let mockService = MockDatabaseService()
+            let state = ConnectionState(databaseService: mockService)
+
+            // Set SQLite active connection — currentConnection shim returns nil
+            let fileProfile = DatabaseFileProfile(name: "mydb", filePath: "/tmp/mydb.sqlite")
+            state.activeConnection = .sqlite(fileProfile)
+            state.selectedDatabase = DatabaseInfo(name: "main")
+            state.selectedTable = TableInfo(name: "users", schema: "main")
+
+            let result = state.isQueryContextValid(
+                tableId: "main.users",
+                databaseId: "main",
+                connectionId: nil  // SQLite queries use nil connectionId
+            )
+            #expect(result == true,
+                    "isQueryContextValid should return true for SQLite connections (connectionId == nil on both sides)")
+        }
     }
 
     // MARK: - Cache Key Format Tests
@@ -511,6 +532,63 @@ struct ConnectionStateTests {
 
             #expect(state.getPrimaryKeys(for: publicTable) == ["public_id"])
             #expect(state.getPrimaryKeys(for: adminTable) == ["admin_id"])
+        }
+    }
+
+    // MARK: - ActiveConnection / currentConnection shim tests
+
+    @Suite("ActiveConnection shim")
+    @MainActor
+    struct ActiveConnectionShimTests {
+
+        private func makeProfile(name: String = "Test") -> ConnectionProfile {
+            ConnectionProfile(
+                host: "localhost",
+                port: 5432,
+                username: "user",
+                password: "pass",
+                database: name,
+                sslMode: .prefer
+            )
+        }
+
+        private func makeFileProfile(name: String = "test.sqlite") -> DatabaseFileProfile {
+            DatabaseFileProfile(name: name, filePath: "/tmp/\(name)")
+        }
+
+        @Test func settingCurrentConnectionWrapsInActiveConnectionPostgres() {
+            let mockService = MockDatabaseService()
+            let state = ConnectionState(databaseService: mockService)
+
+            let profile = makeProfile()
+            state.currentConnection = profile
+
+            guard case .postgres(let stored) = state.activeConnection else {
+                Issue.record("Expected activeConnection == .postgres(_)")
+                return
+            }
+            #expect(stored.id == profile.id)
+        }
+
+        @Test func settingActiveConnectionSqliteReturnsNilFromCurrentConnection() {
+            let mockService = MockDatabaseService()
+            let state = ConnectionState(databaseService: mockService)
+
+            let fileProfile = makeFileProfile()
+            state.activeConnection = .sqlite(fileProfile)
+
+            #expect(state.currentConnection == nil,
+                    "currentConnection shim should return nil when activeConnection is .sqlite")
+        }
+
+        @Test func settingCurrentConnectionNilClearsActiveConnection() {
+            let mockService = MockDatabaseService()
+            let state = ConnectionState(databaseService: mockService)
+
+            state.currentConnection = makeProfile()
+            state.currentConnection = nil
+
+            #expect(state.activeConnection == nil)
         }
     }
 }

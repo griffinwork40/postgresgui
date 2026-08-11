@@ -7,12 +7,39 @@
 
 import Foundation
 
+// MARK: - Active Connection
+
+/// Discriminated union representing the currently active connection (Postgres or SQLite file).
+enum ActiveConnection {
+    case postgres(ConnectionProfile)
+    case sqlite(DatabaseFileProfile)
+
+    var postgresProfile: ConnectionProfile? {
+        if case .postgres(let p) = self { return p }
+        return nil
+    }
+
+    var sqliteProfile: DatabaseFileProfile? {
+        if case .sqlite(let p) = self { return p }
+        return nil
+    }
+}
+
+// MARK: - ConnectionState
+
 /// Manages database connection state and data caches
 @Observable
 @MainActor
 class ConnectionState {
-    // Connection state
-    var currentConnection: ConnectionProfile?
+    // Active connection (Postgres or SQLite file)
+    var activeConnection: ActiveConnection?
+
+    /// Backward-compatible shim: returns the Postgres profile when connected via Postgres.
+    /// Setting this property wraps the profile in `.postgres(_)`.
+    var currentConnection: ConnectionProfile? {
+        get { activeConnection?.postgresProfile }
+        set { activeConnection = newValue.map { .postgres($0) } }
+    }
 
     // Computed property - delegates to DatabaseService
     var isConnected: Bool {
@@ -132,8 +159,8 @@ class ConnectionState {
         // Full shutdown including EventLoopGroup
         await databaseService.shutdown()
 
-        // Reset state
-        currentConnection = nil
+        // Reset state — set activeConnection directly; currentConnection is a computed shim over it
+        activeConnection = nil
         selectedDatabase = nil
         selectedTable = nil
         selectedSchema = nil

@@ -145,3 +145,82 @@ class SQLiteDatabaseService {
         return typed.toDisplayRows()
     }
 }
+
+// MARK: - DatabaseServiceProtocol Conformance
+
+extension SQLiteDatabaseService: DatabaseServiceProtocol {
+
+    var connectedDatabase: String? { connectedDatabaseName }
+
+    func connect(
+        host: String,
+        port: Int,
+        username: String,
+        password: String,
+        database: String,
+        sslMode: SSLMode
+    ) async throws {
+        throw FileOpenError.notSupported
+    }
+
+    func interruptInFlightTableBrowseLoadForSupersession() async {
+        await interruptInFlightOperations()
+    }
+
+    func fetchDatabases() async throws -> [DatabaseInfo] { [] }
+
+    func createDatabase(name: String) async throws { throw FileOpenError.notSupported }
+
+    func deleteDatabase(name: String) async throws { throw FileOpenError.notSupported }
+
+    func fetchTables(database: String) async throws -> [TableInfo] {
+        return try await fetchTables()
+    }
+
+    func fetchSchemas(database: String) async throws -> [String] { ["main"] }
+
+    func deleteTable(schema: String, table: String) async throws { throw FileOpenError.notSupported }
+
+    func truncateTable(schema: String, table: String) async throws { throw FileOpenError.notSupported }
+
+    func generateDDL(schema: String, table: String) async throws -> String {
+        return try await generateDDL(table: table)
+    }
+
+    func fetchAllTableData(schema: String, table: String) async throws -> ([TableRow], [String]) {
+        let typed = try await fetchTableDataTyped(table: table, limit: Int.max, offset: 0)
+        if let error = typed.error { throw error }
+        return (typed.toDisplayRows(), typed.columnNames)
+    }
+
+    func executeDisplayQuery(_ sql: String) async throws -> ([TableRow], [String]) {
+        return try await executeQuery(sql)
+    }
+
+    func deleteRows(
+        schema: String,
+        table: String,
+        primaryKeyColumns: [String],
+        rows: [TableRow]
+    ) async throws { throw FileOpenError.notSupported }
+
+    func updateRow(
+        schema: String,
+        table: String,
+        primaryKeyColumns: [String],
+        originalRow: TableRow,
+        updatedValues: [String: RowEditValue]
+    ) async throws { throw FileOpenError.notSupported }
+
+    func fetchPrimaryKeyColumns(schema: String, table: String) async throws -> [String] {
+        return try await fetchPrimaryKeys(table: table)
+    }
+
+    func fetchColumnInfo(schema: String, table: String) async throws -> [ColumnInfo] {
+        return try await fetchColumnInfo(table: table)
+    }
+
+    func connectFile(filePath: String, readOnly: Bool) async throws {
+        try await connect(filePath: filePath, readOnly: readOnly)
+    }
+}
