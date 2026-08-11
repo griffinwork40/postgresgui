@@ -129,6 +129,7 @@
 			packageProductDependencies = (
 				EAC879F72EEB2A3B0085136E /* PostgresNIO */,
 				EA1234560001000000000002 /* Citadel */,
+				EA5QL1TE0001000000000002 /* GRDB */,
 			);
 			productName = PostgresGUI;
 			productReference = EA3CC4A82EDA978C00DEE264 /* PostgresGUI.app */;
@@ -152,6 +153,7 @@
 			);
 			name = PostgresGUITests;
 			packageProductDependencies = (
+				EA5QL1TE0001000000000003 /* GRDB (tests) */,
 			);
 			productName = PostgresGUITests;
 			productReference = EA3CC4B72EDA978D00DEE264 /* PostgresGUITests.xctest */;
@@ -215,6 +217,7 @@
 			packageReferences = (
 				EAC879F62EEB2A3B0085136E /* XCRemoteSwiftPackageReference "postgres-nio" */,
 				EA1234560001000000000003 /* XCRemoteSwiftPackageReference "Citadel" */,
+				EA5QL1TE0001000000000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = EA3CC4A92EDA978C00DEE264 /* Products */;
@@ -610,6 +613,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		EA5QL1TE0001000000000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/groue/GRDB.swift.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
 		EA1234560001000000000003 /* XCRemoteSwiftPackageReference "Citadel" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/orlandos-nl/Citadel.git";
@@ -629,6 +640,16 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		EA5QL1TE0001000000000002 /* GRDB */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EA5QL1TE0001000000000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
+		EA5QL1TE0001000000000003 /* GRDB (tests) */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EA5QL1TE0001000000000001 /* XCRemoteSwiftPackageReference "GRDB.swift" */;
+			productName = GRDB;
+		};
 		EA1234560001000000000002 /* Citadel */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = EA1234560001000000000003 /* XCRemoteSwiftPackageReference "Citadel" */;
