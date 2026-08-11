@@ -54,6 +54,8 @@ The core rewrite is just **4 files** (~1,400 lines) in the `Services/Postgres/` 
 
 **Recommended SQLite library:** GRDB.swift — it provides the best balance of SQLite feature coverage, Swift idiom alignment, performance, and maintenance activity for an inspector-class application that needs direct access to SQLite's full capability surface.
 
+**Key architectural decision:** Query results are typed end-to-end using a `SQLiteValue` enum that preserves SQLite's five storage classes (null, integer, real, text, blob) through the entire query/service layer. String conversion happens only at presentation and export boundaries. This eliminates silent data loss from premature string coercion, preserves duplicate column names, and retains the typed values needed for future keyset pagination cursors. The existing `TableRow` type is retained for presentation but populated by a `ResultRow.toDisplayRow(columns:)` conversion at the view boundary.
+
 **Recommended first coding task:** Implement the minimal path from app launch → open `.sqlite` file → discover tables → select table → display rows. This slice touches exactly 4 new files and ~10 adapted files, validating the full vertical stack before building secondary features.
 
 ---
@@ -193,7 +195,11 @@ postgresgui/
 │   │   ├── SavedQuery.swift              # Saved query (SwiftData)
 │   │   ├── TabState.swift                # Tab persistence (SwiftData)
 │   │   ├── TableInfo.swift               # Table metadata (name, schema, type)  ← ADAPT
-│   │   └── TableRow.swift                # Row data: [String: String?]  (fully generic)
+│   │   ├── TableRow.swift                # Row data: [String: String?]  (presentation-layer only; populated from ResultRow at view boundary)
+│   │   ├── SQLiteValue.swift             # ← NEW: typed storage class enum (null/integer/real/text/blob)
+│   │   ├── ResultRow.swift               # ← NEW: typed result row (positional SQLiteValue array + UUID id)
+│   │   ├── ResultColumn.swift            # ← NEW: column descriptor (name + declaredType)
+│   │   └── TypedQueryResult.swift        # ← NEW: complete typed result set (columns + rows + timing + affectedRows)
 │   │
 │   ├── State/                            # Observable state management
 │   │   ├── AppState.swift                # Central state coordinator  ← ADAPT
@@ -427,11 +433,11 @@ Removing PostgresNIO and Citadel eliminates **14 transitive SPM packages**. The 
 | Location | SQL Construct | SQLite Equivalent |
 |----------|--------------|-------------------|
 | `PostgresQueryExecutor.fetchDatabases()` | `SELECT datname FROM pg_database` | N/A — SQLite has no server databases |
-| `PostgresQueryExecutor.fetchTables()` | `pg_tables`, `information_schema.foreign_tables` | `SELECT name, type FROM sqlite_master WHERE type IN ('table','view')` |
+| `PostgresQueryExecutor.fetchTables()` | `pg_tables`, `information_schema.foreign_tables` | `SELECT name, type FROM sqlite_schema WHERE type IN ('table','view')` |
 | `PostgresQueryExecutor.fetchSchemas()` | `pg_tables`, `information_schema` | `PRAGMA database_list` (for attached DBs) |
 | `PostgresQueryExecutor.fetchPrimaryKeys()` | `pg_index`, `pg_attribute`, `::regclass` | `PRAGMA table_info(table)` → `pk > 0` |
 | `PostgresQueryExecutor.fetchColumns()` | `information_schema.columns` | `PRAGMA table_info(table)` |
-| `PostgresQueryExecutor.generateDDL()` | `information_schema`, `pg_constraint`, `pg_get_constraintdef()` | `SELECT sql FROM sqlite_master WHERE name = ?` |
+| `PostgresQueryExecutor.generateDDL()` | `information_schema`, `pg_constraint`, `pg_get_constraintdef()` | `SELECT sql FROM sqlite_schema WHERE name = ?` |
 | `QueryService.makeWrappedTableBrowseQuery()` | `SELECT to_jsonb(q) AS row FROM (…) q` | `SELECT * FROM "table" LIMIT n OFFSET n` |
 | `AppState.setSchemaSearchPath()` | `SET search_path TO …` | N/A — SQLite has no search path |
 
@@ -459,7 +465,9 @@ Removing PostgresNIO and Citadel eliminates **14 transitive SPM packages**. The 
 
 **KEEP** — 83 files (~14,800 lines) require zero changes:
 
-All view primitives (Badge, LoadingOverlay, ResizableSplitView, LineNumberRulerView, EmptyQueryResultsView), most view components (JSONViewerView, QueryResultsComponent, QueryEditorComponent, all sheets, toast, modals), data models (TableRow, ColumnInfo, QueryResult, DatabaseInfo, RowEditValue, RowUpdate, QueryFolder, QueryHistory, SavedQuery), state managers (LoadingState, TabManager), logic (AppLaunchDecisions, QueryDecisions), utilities (CSVExporter, JSONDocument, QueryTypeDetector, QueryHistoryExporter, TableBrowseResultCompactor, DebugLog, TimeInterval extensions, ClockProtocol, UserDefaultsProtocol, Timeout), protocol-only services (TableService, MetadataService, TableMetadataService, RowOperationsService, TabService), and most service protocols.
+All view primitives (Badge, LoadingOverlay, ResizableSplitView, LineNumberRulerView, EmptyQueryResultsView), most view components (JSONViewerView, QueryResultsComponent, QueryEditorComponent, all sheets, toast, modals), data models (ColumnInfo, QueryResult, DatabaseInfo, RowEditValue, RowUpdate, QueryFolder, QueryHistory, SavedQuery), state managers (LoadingState, TabManager), logic (AppLaunchDecisions, QueryDecisions), utilities (CSVExporter, JSONDocument, QueryTypeDetector, QueryHistoryExporter, TableBrowseResultCompactor, DebugLog, TimeInterval extensions, ClockProtocol, UserDefaultsProtocol, Timeout), protocol-only services (TableService, MetadataService, TableMetadataService, RowOperationsService, TabService), and most service protocols.
+
+`TableRow` is retained for presentation-layer use. `QueryResultsComponent` and `CSVExporter` continue to consume `[TableRow]`; the new typed layer feeds them via `ResultRow.toDisplayRow(columns:)` at the view boundary. Four new model files are added (not replacing existing files): `SQLiteValue.swift`, `ResultRow.swift`, `ResultColumn.swift`, `TypedQueryResult.swift`.
 
 **ADAPT** — 38 files (~8,200 lines) require surgical edits:
 
@@ -478,7 +486,7 @@ All view primitives (Badge, LoadingOverlay, ResizableSplitView, LineNumberRulerV
 | `Services/Postgres/PostgresConnectionManager.swift` | `Services/SQLite/SQLiteConnectionManager.swift` | NIO → file handle |
 | `Services/Postgres/PostgresQueryExecutor.swift` | `Services/SQLite/SQLiteQueryExecutor.swift` | All SQL is PostgreSQL-specific |
 | `Services/Postgres/PostgresDatabaseConnection.swift` | `Services/SQLite/SQLiteDatabaseConnection.swift` | PostgresNIO types |
-| `Services/Postgres/PostgresResultMapper.swift` | `Services/SQLite/SQLiteResultMapper.swift` | PostgresNIO decoding |
+| `Services/Postgres/PostgresResultMapper.swift` | `Services/SQLite/SQLiteResultMapper.swift` | PostgresNIO decoding → typed `TypedQueryResult` output |
 | `Models/ConnectionProfile.swift` | `Models/DatabaseFileProfile.swift` | host/port/SSL/SSH → file path |
 | `Errors/ConnectionError.swift` | `Errors/FileOpenError.swift` | Network errors → file errors |
 | `Utilities/ConnectionStringParser.swift` | *(delete or replace with file-path utilities)* | PostgreSQL URIs |
@@ -574,6 +582,8 @@ SwiftUI Views ──→ ViewModels ──→ State ──→ Services (protocol-
 │  SQLite Implementation (NEW — replaces Postgres/)        │
 │  SQLiteConnectionManager, SQLiteQueryExecutor,           │
 │  SQLiteDatabaseConnection, SQLiteResultMapper            │
+│  (ResultMapper returns TypedQueryResult; string          │
+│   conversion happens at the view boundary only)          │
 ├─────────────────────────────────────────────────────────┤
 │  GRDB.swift → sqlite3 (system library)                   │
 └─────────────────────────────────────────────────────────┘
@@ -673,11 +683,11 @@ All downstream protocols (`DatabaseServiceProtocol`, `ConnectionServiceProtocol`
 
 2. **Inspector-class access pattern.** Unlike ORMs that hide SQL, GRDB allows arbitrary SQL execution via `db.execute(sql:)` and `Row` iteration — exactly what a database inspector needs. The app must run user-supplied SQL, not just ORM-generated queries.
 
-3. **Clean mapping to existing protocols.** GRDB's `DatabaseQueue` maps cleanly to the existing `ConnectionManagerProtocol.withConnection {}` pattern. GRDB's `Row` (column-name-to-value dictionary) maps directly to `TableRow` (`[String: String?]`).
+3. **Clean mapping to existing protocols.** GRDB's `DatabaseQueue` maps cleanly to the existing `ConnectionManagerProtocol.withConnection {}` pattern. GRDB's `Row` provides positional column access via index, mapping cleanly to the new `TypedQueryResult` / `ResultRow` model that preserves SQLite storage classes end-to-end.
 
 4. **Async support.** GRDB 6.x supports structured concurrency with `DatabaseQueue.read {}` and `DatabaseQueue.write {}` as async functions, fitting the existing `async/await` architecture.
 
-5. **Performance.** GRDB uses SQLite's C API directly with minimal overhead. It supports WAL mode, shared cache, and connection pooling via `DatabasePool` — important for responsive browsing of large databases.
+5. **Performance.** GRDB uses SQLite's C API directly with minimal overhead. It supports WAL mode and shared cache. `DatabaseQueue` serializes all access through a single connection, which is the correct starting point (see §7.4 on connection choice rationale).
 
 6. **Active maintenance.** GRDB has consistent releases, an active maintainer (Gwendal Roué), and strong community adoption in the Swift/macOS ecosystem.
 
@@ -693,6 +703,10 @@ All downstream protocols (`DatabaseServiceProtocol`, `ConnectionServiceProtocol`
 
 ### 7.4 Integration Pattern
 
+**Connection choice: `DatabaseQueue` not `DatabasePool`.**
+
+Use one `DatabaseQueue` per opened database initially. `DatabaseQueue` serializes all access through a single connection, which guarantees predictable behavior for connection-scoped features: `ATTACH DATABASE`, `PRAGMA` settings, `TEMP` tables/views, and transactions all work correctly because they share a single connection. `DatabasePool` opens multiple reader connections that do NOT share these connection-scoped states — a PRAGMA set on the writer is invisible to readers, and a TEMP table created on one connection doesn't exist on another. Do not use `DatabasePool` unless profiling demonstrates that read contention is the bottleneck, and only after verifying that connection-scoped features are not in use.
+
 ```swift
 import GRDB
 
@@ -703,10 +717,8 @@ actor SQLiteConnectionManager: ConnectionManagerProtocol {
         var config = Configuration()
         config.readonly = readOnly
         config.busyMode = .timeout(5.0)  // 5 second busy timeout
-        config.prepareDatabase { db in
-            // Enable foreign key enforcement
-            try db.execute(sql: "PRAGMA foreign_keys = ON")
-        }
+        // No automatic PRAGMAs on open — the app reads and displays existing
+        // PRAGMA state and lets the user change values explicitly.
         dbQueue = try DatabaseQueue(path: filePath, configuration: config)
     }
 
@@ -774,44 +786,37 @@ The sidebar should expose SQLite objects:
 **Discovery queries:**
 ```sql
 -- Tables (excluding SQLite internals)
-SELECT name FROM sqlite_master
+SELECT name FROM sqlite_schema
 WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
 ORDER BY name;
 
 -- Views
-SELECT name FROM sqlite_master WHERE type = 'view' ORDER BY name;
+SELECT name FROM sqlite_schema WHERE type = 'view' ORDER BY name;
 
 -- Indexes (excluding auto-indexes)
-SELECT name, tbl_name FROM sqlite_master
+SELECT name, tbl_name FROM sqlite_schema
 WHERE type = 'index' AND name NOT LIKE 'sqlite_%'
 ORDER BY name;
 
 -- Triggers
-SELECT name, tbl_name FROM sqlite_master
+SELECT name, tbl_name FROM sqlite_schema
 WHERE type = 'trigger' ORDER BY name;
 ```
 
 **FTS table identification:**
 ```sql
--- FTS5 tables have a shadow table pattern
-SELECT name FROM sqlite_master
+-- Primary: detect from CREATE VIRTUAL TABLE statement (preferred over shadow-table heuristics)
+SELECT name, sql FROM sqlite_schema
 WHERE type = 'table'
-AND name NOT LIKE '%_content'
-AND name NOT LIKE '%_data'
-AND name NOT LIKE '%_docsize'
-AND name NOT LIKE '%_config'
-AND name NOT LIKE '%_idx'
-AND EXISTS (
-    SELECT 1 FROM sqlite_master AS m2
-    WHERE m2.name = sqlite_master.name || '_content'
-    AND m2.type = 'table'
-);
+  AND sql LIKE 'CREATE VIRTUAL TABLE%USING fts%';
 ```
+
+Parse the `sql` column to extract the FTS module (fts3/fts4/fts5), tokenizer, and content table. Shadow-table existence can be used as a secondary confirmation signal, but shadow-table naming conventions are implementation details that may change.
 
 **Virtual table identification:**
 ```sql
 -- Check the CREATE statement for VIRTUAL TABLE
-SELECT name FROM sqlite_master
+SELECT name FROM sqlite_schema
 WHERE type = 'table'
 AND sql LIKE 'CREATE VIRTUAL TABLE%';
 ```
@@ -835,7 +840,7 @@ Selecting a table shows:
 
 **DDL tab:**
 ```sql
-SELECT sql FROM sqlite_master WHERE name = ? AND type = 'table';
+SELECT sql FROM sqlite_schema WHERE name = ? AND type = 'table';
 ```
 
 **SQLite-specific table properties to surface:**
@@ -870,6 +875,8 @@ SELECT sql FROM sqlite_master WHERE name = ? AND type = 'table';
 - **Dynamic typing / type affinity:** SQLite allows storing any type in any column (unless STRICT). The data browser should show the actual storage class (via `typeof(column)`), not just the declared type. Display a visual indicator when the stored type differs from the declared type.
 - **Generated columns:** Show as read-only in the editor; do not include in INSERT/UPDATE statements.
 
+> **Known limitation: deep OFFSET performance.** `LIMIT N OFFSET M` requires SQLite to scan and discard M rows before returning N rows. For tables with millions of rows, navigating to page 10,000+ becomes progressively slower. The MVP accepts this tradeoff for simplicity. A future improvement would implement keyset pagination (sometimes called "seek method") using a `WHERE rowid > last_seen_rowid` or `WHERE (pk_col1, pk_col2) > (last_val1, last_val2)` predicate, which performs in constant time regardless of page depth. The data model (`ResultRow` with typed `SQLiteValue`) already preserves the column values needed for keyset cursors.
+
 ### 8.5 SQL Editor
 
 The existing SQL editor (`SyntaxHighlightedEditor.swift`) provides:
@@ -888,7 +895,7 @@ The existing SQL editor (`SyntaxHighlightedEditor.swift`) provides:
    - FTS: `MATCH`, `rank`, `bm25()`, `highlight()`, `snippet()`
 
 2. **Autocomplete.** Basic SQLite-aware autocomplete:
-   - Table names from `sqlite_master`
+   - Table names from `sqlite_schema`
    - Column names from `PRAGMA table_info()` for the most recently referenced table
    - SQLite keywords, functions, PRAGMAs
    - Not a full language server — use heuristic word-boundary matching
@@ -919,7 +926,7 @@ This is a key differentiating feature. Surface a dedicated "Database Info" inspe
 | Page count | `PRAGMA page_count` | e.g., "34,821 pages" |
 | Free pages | `PRAGMA freelist_count` | e.g., "142 pages (568 KB reclaimable)" |
 | Cache size | `PRAGMA cache_size` | Pages or KB |
-| Foreign keys enforced | `PRAGMA foreign_keys` | ON / OFF (with toggle action) |
+| Foreign keys enforced | `PRAGMA foreign_keys` | ON / OFF — display current value; user can change via explicit action (app never sets this automatically on open) |
 | Schema version | `PRAGMA schema_version` | Integer |
 | User version | `PRAGMA user_version` | Integer |
 | Encoding | `PRAGMA encoding` | UTF-8 / UTF-16le / UTF-16be |
@@ -936,7 +943,7 @@ This is a key differentiating feature. Surface a dedicated "Database Info" inspe
 | VACUUM | `VACUUM` | Requires 2× disk space; locks database | Yes — rebuilds entire file |
 | ANALYZE | `ANALYZE` | Safe; updates statistics | Yes — writes to `sqlite_stat1` |
 | Optimize | `PRAGMA optimize` | Safe; runs ANALYZE where beneficial | Yes |
-| Enable foreign keys | `PRAGMA foreign_keys = ON` | Session-only; no permanent change | No (session) |
+| Set foreign keys ON/OFF | `PRAGMA foreign_keys = ON` / `PRAGMA foreign_keys = OFF` | Session-only; user-initiated only — app never sets this automatically | No (session) |
 
 **UI for maintenance actions:**
 - Each action shows a clear description, estimated impact, and whether it mutates data
@@ -982,8 +989,8 @@ COMPOUND SUBQUERIES 1 AND 2 USING TEMP B-TREE (UNION)
 | CSV | Existing `CSVExporter` — zero changes | Query results or full table |
 | JSON | Existing `JSONDocument` + export logic — zero changes | Query results or full table |
 | Copy results | Existing clipboard integration | Selected cells or rows |
-| Schema/DDL copy | `SELECT sql FROM sqlite_master WHERE name = ?` | Selected table(s) |
-| Full schema export | `SELECT sql FROM sqlite_master ORDER BY type, name` | Entire database |
+| Schema/DDL copy | `SELECT sql FROM sqlite_schema WHERE name = ?` | Selected table(s) |
+| Full schema export | `SELECT sql FROM sqlite_schema ORDER BY type, name` | Entire database |
 
 ### 8.9 BLOB Inspection
 
@@ -1086,7 +1093,7 @@ SELECT
     p."from" AS source_column,
     p."table" AS target_table,
     p."to" AS target_column
-FROM sqlite_master AS m
+FROM sqlite_schema AS m
 JOIN pragma_foreign_key_list(m.name) AS p
 WHERE m.type = 'table';
 ```
@@ -1107,9 +1114,16 @@ WHERE m.type = 'table';
 Recognize and provide useful inspection for FTS3/FTS4/FTS5 tables.
 
 **Detection:**
-- FTS5: Check for the `_content`, `_data`, `_docsize`, `_config`, `_idx` shadow table pattern
-- FTS3/4: Check for `_content`, `_segments`, `_segdir` shadow table pattern
-- Or: parse `CREATE VIRTUAL TABLE` DDL for `USING fts3/fts4/fts5`
+
+Detect FTS tables primarily from the `CREATE VIRTUAL TABLE` statement — this is explicit and stable:
+
+```sql
+SELECT name, sql FROM sqlite_schema
+WHERE type = 'table'
+  AND sql LIKE 'CREATE VIRTUAL TABLE%USING fts%';
+```
+
+Parse the `sql` column to extract the FTS module (fts3/fts4/fts5), tokenizer, and content table. Shadow-table existence (e.g., `_content`, `_data`, `_docsize`, `_config`, `_idx` for FTS5; `_content`, `_segments`, `_segdir` for FTS3/4) can serve as a secondary confirmation signal, but should not be the primary detection method because shadow-table naming conventions are implementation details that could change.
 
 **Inspection features:**
 - Show FTS module type (fts3/fts4/fts5) and tokenizer
@@ -1147,7 +1161,7 @@ Support `ATTACH DATABASE` for inspecting multiple SQLite files simultaneously.
 ```sql
 ATTACH DATABASE '/path/to/other.db' AS analytics;
 -- Tables visible via:
-SELECT name FROM analytics.sqlite_master WHERE type = 'table';
+SELECT name FROM analytics.sqlite_schema WHERE type = 'table';
 ```
 
 ---
@@ -1259,18 +1273,68 @@ SQLite uses dynamic typing with "type affinity" — a column's declared type sug
 | TEXT | Left-aligned string |
 | BLOB | `[BLOB: N bytes]` with click-to-inspect |
 
-### 11.3 Existing TableRow Model
+### 11.3 Typed Value Model
 
-The existing `TableRow` is `struct TableRow: Identifiable { var values: [String: String?] }` — all values are string-encoded with `nil` for NULL. This is simple and works well for display.
+The query/service layer uses a typed value model that preserves SQLite's five storage classes end-to-end. String conversion is deferred to the view/export boundary only.
 
-For SQLite, we maintain this pattern:
-- INTEGER → `String(value)` (e.g., `"42"`)
-- REAL → `String(value)` (e.g., `"3.14"`)
-- TEXT → value as-is
-- BLOB → `"[BLOB: N bytes]"` placeholder
-- NULL → `nil`
+```swift
+/// SQLite storage class preserved through the query layer.
+enum SQLiteValue: Equatable, Sendable {
+    case null
+    case integer(Int64)
+    case real(Double)
+    case text(String)
+    case blob(Data)
+}
 
-This preserves full compatibility with the existing `QueryResultsComponent`, `CSVExporter`, `JSONViewerView`, and all other consumers.
+/// A single column in a result set.
+struct ResultColumn: Sendable {
+    let name: String
+    let declaredType: String?  // From column metadata, nil for expressions
+}
+
+/// A single row from a query result. Preserves column order and allows duplicate column names.
+struct ResultRow: Identifiable, Sendable {
+    let id: UUID
+    let values: [SQLiteValue]  // Positional, indexed by column position
+}
+
+/// Complete typed query result set.
+struct TypedQueryResult: Sendable {
+    let columns: [ResultColumn]  // Ordered; may contain duplicate names
+    let rows: [ResultRow]
+    let executionTime: TimeInterval
+    let affectedRows: Int?  // For INSERT/UPDATE/DELETE
+}
+```
+
+**Key design points:**
+
+- `ResultRow.values` is a **positional array**, not a dictionary. Column lookup is by position via `columns[index]`, not by name. This preserves duplicate column names (e.g., `SELECT a.id, b.id FROM …` yields two columns both named `"id"`).
+- String conversion happens **only at presentation/export boundaries**, never in the query or service layer.
+- The existing `TableRow` type (`[String: String?]` dictionary) is retained for presentation-layer consumers (`QueryResultsComponent`, `CSVExporter`, `JSONViewerView`) and is populated by a `ResultRow.toDisplayRow(columns:)` conversion at the view boundary:
+
+```swift
+extension ResultRow {
+    /// Convert to a display-layer TableRow. Called at the view boundary only.
+    func toDisplayRow(columns: [ResultColumn]) -> TableRow {
+        var displayValues: [String: String?] = [:]
+        for (index, column) in columns.enumerated() {
+            guard index < values.count else { continue }
+            switch values[index] {
+            case .null:             displayValues[column.name] = nil
+            case .integer(let i):   displayValues[column.name] = String(i)
+            case .real(let d):      displayValues[column.name] = String(d)
+            case .text(let s):      displayValues[column.name] = s
+            case .blob(let data):   displayValues[column.name] = "[BLOB: \(data.count) bytes]"
+            }
+        }
+        return TableRow(values: displayValues)
+    }
+}
+```
+
+Note: when two columns share a name, `toDisplayRow` will overwrite the first with the second in the `TableRow` dictionary. This is acceptable for display-only use; the typed `ResultRow` retains both values at their positional indices.
 
 ### 11.4 Type Detection for Editing
 
@@ -1307,62 +1371,63 @@ User action
         }
         → SQLiteDatabaseConnection.executeQuery(sql)
           → GRDB db.execute(sql) or db.makeStatement(sql).cursor()
-            → Row iteration
-      → SQLiteResultMapper.mapRowsToTableRows(rows)
-        → [TableRow]
-    → TableBrowseResultCompactor (truncates long cells — unchanged)
-  → QueryState.queryResults = results
+            → Row iteration → TypedQueryResult (SQLiteValue values, positional)
+      → SQLiteResultMapper returns TypedQueryResult (typed — no string conversion here)
+    → At view boundary: ResultRow.toDisplayRow(columns:) → [TableRow]
+    → TableBrowseResultCompactor (truncates long cells — unchanged, operates on TableRow)
+  → QueryState.queryResults = results (typed TypedQueryResult stored in state;
+    TableRow conversion happens in the view model / component)
 ```
 
-Key simplification: no `to_jsonb()` wrapping/unwrapping, no `QueryResultNormalizer`.
+Key simplifications: no `to_jsonb()` wrapping/unwrapping, no `QueryResultNormalizer`. String conversion is deferred from the mapper to the view boundary.
 
 ### 12.2 SQLiteQueryExecutor Implementation Sketch
 
 ```swift
 final class SQLiteQueryExecutor: QueryExecutorProtocol {
     func fetchTables(connection: DatabaseConnectionProtocol) async throws -> [TableInfo] {
-        let rows = try await connection.executeQuery("""
-            SELECT name, type, sql FROM sqlite_master
+        let result = try await connection.executeQuery("""
+            SELECT name, type, sql FROM sqlite_schema
             WHERE type IN ('table', 'view')
             AND name NOT LIKE 'sqlite_%'
             ORDER BY type DESC, name ASC
         """)
-        return try await resultMapper.mapToTableInfos(rows)
+        return try resultMapper.mapToTableInfos(result)
     }
 
     func fetchColumns(connection: DatabaseConnectionProtocol,
                       schema: String, table: String) async throws -> [ColumnInfo] {
-        let rows = try await connection.executeQuery(
+        let result = try await connection.executeQuery(
             "PRAGMA table_xinfo(\(table.quotedDatabaseIdentifier))")
-        return try await resultMapper.mapToColumnInfos(rows)
+        return try resultMapper.mapToColumnInfos(result)
     }
 
     func fetchPrimaryKeys(connection: DatabaseConnectionProtocol,
                           schema: String, table: String) async throws -> [String] {
-        let rows = try await connection.executeQuery(
+        let result = try await connection.executeQuery(
             "PRAGMA table_info(\(table.quotedDatabaseIdentifier))")
-        // Filter rows where pk > 0, sort by pk value
-        return try await resultMapper.extractPrimaryKeyNames(rows)
+        // Filter rows where pk column > 0, sort by pk value
+        return try resultMapper.extractPrimaryKeyNames(result)
     }
 
     func generateDDL(connection: DatabaseConnectionProtocol,
                      schema: String, table: String) async throws -> String {
-        let rows = try await connection.executeQuery(
-            "SELECT sql FROM sqlite_master WHERE name = ? AND type IN ('table', 'view')",
+        let result = try await connection.executeQuery(
+            "SELECT sql FROM sqlite_schema WHERE name = ? AND type IN ('table', 'view')",
             parameters: [.init(value: table, type: .string)])
-        // Return the CREATE statement directly
-        return try await resultMapper.extractSingleString(rows) ?? "-- No DDL found"
+        // Extract from the first ResultRow at column index 0 (the sql column)
+        return resultMapper.extractSingleString(result) ?? "-- No DDL found"
     }
 
     func fetchTableData(connection: DatabaseConnectionProtocol,
                         schema: String, table: String,
-                        limit: Int, offset: Int) async throws -> [TableRow] {
+                        limit: Int, offset: Int) async throws -> TypedQueryResult {
         let sql = """
             SELECT rowid, * FROM \(table.quotedDatabaseIdentifier)
             LIMIT \(limit) OFFSET \(offset)
         """
-        let rows = try await connection.executeQuery(sql)
-        return try await resultMapper.mapRowsToTableRows(rows)
+        // Returns TypedQueryResult; string conversion happens at the view boundary.
+        return try await connection.executeQuery(sql)
     }
 }
 ```
@@ -1413,9 +1478,9 @@ For single-statement queries, no explicit transaction is needed — SQLite auto-
 func updateRow(connection: DatabaseConnectionProtocol,
                schema: String, table: String,
                primaryKeyColumns: [String],
-               originalRow: TableRow,
-               updatedValues: [String: String?]) async throws {
-    let setClauses = updatedValues.keys.map { "\($0.quotedDatabaseIdentifier) = ?" }
+               originalRow: ResultRow,              // typed row — PK values extracted by column position
+               updatedValues: [(column: ResultColumn, value: SQLiteValue)]) async throws {
+    let setClauses = updatedValues.map { "\($0.column.name.quotedDatabaseIdentifier) = ?" }
     let whereClauses = primaryKeyColumns.map { "\($0.quotedDatabaseIdentifier) = ?" }
 
     let sql = """
@@ -1424,7 +1489,7 @@ func updateRow(connection: DatabaseConnectionProtocol,
         WHERE \(whereClauses.joined(separator: " AND "))
     """
 
-    let params: [DatabaseParameter] = /* SET values + WHERE values */
+    let params: [DatabaseParameter] = /* SET SQLiteValues + WHERE SQLiteValues */
     try await connection.executeQuery(sql, parameters: params)
 }
 ```
@@ -1434,17 +1499,17 @@ func updateRow(connection: DatabaseConnectionProtocol,
 ```swift
 func insertRow(connection: DatabaseConnectionProtocol,
                schema: String, table: String,
-               values: [String: String?]) async throws {
-    let columns = values.keys.map { $0.quotedDatabaseIdentifier }
+               values: [(column: ResultColumn, value: SQLiteValue)]) async throws {
+    let columnNames = values.map { $0.column.name.quotedDatabaseIdentifier }
     let placeholders = Array(repeating: "?", count: values.count)
 
     let sql = """
         INSERT INTO \(table.quotedDatabaseIdentifier)
-        (\(columns.joined(separator: ", ")))
+        (\(columnNames.joined(separator: ", ")))
         VALUES (\(placeholders.joined(separator: ", ")))
     """
 
-    let params: [DatabaseParameter] = /* values */
+    let params: [DatabaseParameter] = /* SQLiteValues */
     try await connection.executeQuery(sql, parameters: params)
 }
 ```
@@ -1455,14 +1520,15 @@ func insertRow(connection: DatabaseConnectionProtocol,
 func deleteRows(connection: DatabaseConnectionProtocol,
                 schema: String, table: String,
                 primaryKeyColumns: [String],
-                rows: [TableRow]) async throws {
+                rows: [ResultRow],           // typed rows — PK values extracted by column position
+                columns: [ResultColumn]) async throws {
     for row in rows {
         let whereClauses = primaryKeyColumns.map { "\($0.quotedDatabaseIdentifier) = ?" }
         let sql = """
             DELETE FROM \(table.quotedDatabaseIdentifier)
             WHERE \(whereClauses.joined(separator: " AND "))
         """
-        let params: [DatabaseParameter] = /* PK values from row */
+        let params: [DatabaseParameter] = /* SQLiteValues at PK column positions */
         try await connection.executeQuery(sql, parameters: params)
     }
 }
@@ -1492,6 +1558,8 @@ enum QueryDangerLevel {
     case destructive   // DROP TABLE, DROP INDEX, DROP TRIGGER
 }
 ```
+
+> **Important:** Destructive-SQL classification is best-effort UX only, not a correctness or security boundary. SQL is a Turing-complete language; static analysis of SQL text cannot reliably determine whether a statement is destructive. A `SELECT` can call a user-defined function that modifies state; a `DELETE` with a `WHERE 1=0` clause deletes nothing. The confirmation dialogs are a convenience to catch obvious mistakes (typos, forgotten WHERE clauses), not a safety guarantee. The app should never claim to prevent destructive operations — only to surface likely-destructive patterns for human review.
 
 **Protection rules:**
 - `DELETE FROM table` without `WHERE` → confirmation dialog: "This will delete ALL rows from [table]. Are you sure?"
@@ -1589,10 +1657,11 @@ Safe Mode preference is persisted per-database in `DatabaseFileProfile`.
 - Page cache: LRU cache holding recent pages (existing `TableBrowsePageCacheContext`)
 - Background prefetch: preload next page while user views current page
 
-**Total row count:**
-- `SELECT COUNT(*) FROM table` — executed once on table selection
-- Displayed as "Showing rows 1–100 of 1,234,567"
-- For very large tables (> 1M rows): use `SELECT COUNT(*) OVER() FROM table LIMIT 1` or show estimate
+> **Known limitation: deep OFFSET performance.** `LIMIT N OFFSET M` requires SQLite to scan and discard M rows before returning N rows. For tables with millions of rows, navigating to page 10,000+ becomes progressively slower. The MVP accepts this tradeoff for simplicity. A future improvement would implement keyset pagination (sometimes called "seek method") using a `WHERE rowid > last_seen_rowid` or `WHERE (pk_col1, pk_col2) > (last_val1, last_val2)` predicate, which performs in constant time regardless of page depth. The data model (`ResultRow` with typed `SQLiteValue`) already preserves the column values needed for keyset cursors.
+
+**Total row count (lazy and cancellable):**
+
+Row counting is lazy, background, and cancellable. When a table is selected, the first page of rows loads immediately without waiting for a count. A background task issues `SELECT COUNT(*) FROM "table"` separately. If the count query takes longer than ~200ms, the UI shows "Showing rows 1–100" without a total count. When the count completes, the UI updates to "Showing rows 1–100 of 1,234,567". If the user navigates away before the count completes, the count task is cancelled. For very large tables, consider using the `max_page_count` pragma or `stat` virtual table as an estimate instead of an exact count.
 
 ### 15.3 Lazy Loading
 
@@ -1624,7 +1693,7 @@ All query execution already happens off the main thread via `async`/`await` and 
 - BLOB data loaded on-demand, not cached
 - Query results limited by `LIMIT` clauses
 - Large databases (> 1 GB) display a notification suggesting performance-sensitive operations
-- GRDB's `DatabasePool` for read-heavy workloads (concurrent reads)
+- Start with `DatabaseQueue` (single connection, serialized access). Only consider `DatabasePool` if profiling shows read contention is the bottleneck AND connection-scoped features (ATTACH, PRAGMA, TEMP tables) are not in use (see §7.4).
 
 ### 15.8 SwiftUI Table Optimization
 
@@ -1666,7 +1735,7 @@ The project has 17 test files with ~2,200 lines covering:
 - Security-scoped bookmark creation and resolution
 
 **SQLite query executor tests:**
-- Fetch tables from `sqlite_master`
+- Fetch tables from `sqlite_schema`
 - Fetch columns via `PRAGMA table_info`
 - Fetch primary keys (single, composite, rowid alias, WITHOUT ROWID)
 - Generate DDL
@@ -1678,8 +1747,10 @@ The project has 17 test files with ~2,200 lines covering:
 - Attached database table enumeration
 
 **SQLite result mapper tests:**
-- Map all SQLite storage classes (INTEGER, REAL, TEXT, BLOB, NULL)
-- Handle type affinity mismatches
+- Map all SQLite storage classes to `SQLiteValue` (integer, real, text, blob, null) — verify no premature string conversion
+- Verify `TypedQueryResult` column order and that duplicate column names are preserved in `ResultRow.values`
+- Verify `ResultRow.toDisplayRow(columns:)` converts correctly for display consumers
+- Handle type affinity mismatches (stored type ≠ declared type)
 - Map PRAGMA output to domain models
 
 **Integration tests:**
@@ -1898,7 +1969,7 @@ Some tables cannot be edited if they lack explicit primary keys and don't have a
 | Implement `fetchTables()` | SQLite query executor | 2 hours |
 | Implement `fetchColumns()` | PRAGMA table_info/table_xinfo | 2 hours |
 | Implement `fetchPrimaryKeys()` | PRAGMA table_info → pk column | 1 hour |
-| Implement `generateDDL()` | sqlite_master query | 30 min |
+| Implement `generateDDL()` | sqlite_schema query | 30 min |
 | Adapt sidebar | Remove schema picker/grouping | 3 hours |
 | Adapt table list | Flat list, remove foreign table type | 1 hour |
 | Syntax highlighting | SQLite keyword set | 2 hours |
@@ -2028,7 +2099,7 @@ This validates the full vertical stack (UI → ViewModel → State → Service �
 2. **New: `Services/SQLite/SQLiteDatabaseConnection.swift`** — implements `DatabaseConnectionProtocol` wrapping GRDB's `Database`
 3. **New: `Services/SQLite/SQLiteConnectionManager.swift`** — implements `ConnectionManagerProtocol` wrapping GRDB's `DatabaseQueue`
 4. **New: `Services/SQLite/SQLiteQueryExecutor.swift`** — implements `QueryExecutorProtocol` with `fetchTables`, `fetchColumns`, `fetchPrimaryKeys`, `fetchTableData`, `executeQuery` (others can stub/throw)
-5. **New: `Services/SQLite/SQLiteResultMapper.swift`** — implements `ResultMapperProtocol` mapping GRDB `Row` to `TableRow`, `ColumnInfo`, `TableInfo`
+5. **New: `Services/SQLite/SQLiteResultMapper.swift`** — implements `ResultMapperProtocol` mapping GRDB `Row` to `TypedQueryResult` (using `SQLiteValue`), `ColumnInfo`, `TableInfo`; string conversion to `TableRow` happens at the view boundary via `ResultRow.toDisplayRow(columns:)`
 6. **New: `Models/DatabaseFileProfile.swift`** — replaces `ConnectionProfile` for file-based "connections"
 7. **New: `Errors/FileOpenError.swift`** — SQLite-specific error cases (fileNotFound, permissionDenied, corruptDatabase, fileLocked)
 8. **Adapt: `Services/Protocols/ConnectionManagerProtocol.swift`** — change `connect()` signature to accept file path
@@ -2057,7 +2128,7 @@ This validates the full vertical stack (UI → ViewModel → State → Service �
 
 1. App launches without errors
 2. User can open a `.sqlite`, `.db`, or `.sqlite3` file via file picker
-3. Sidebar shows the list of tables discovered from `sqlite_master`
+3. Sidebar shows the list of tables discovered from `sqlite_schema`
 4. Clicking a table displays its rows in the data browser with pagination
 5. User can type arbitrary SQL in the editor and see results
 6. Column metadata (name, type, PK, nullable) is shown for selected tables
@@ -2077,7 +2148,11 @@ This validates the full vertical stack (UI → ViewModel → State → Service �
 | `Services/SQLite/SQLiteConnectionManager.swift` | New | ~150 lines: actor with DatabaseQueue, connect/disconnect/withConnection |
 | `Services/SQLite/SQLiteDatabaseConnection.swift` | New | ~120 lines: DatabaseConnectionProtocol wrapper around GRDB Database |
 | `Services/SQLite/SQLiteQueryExecutor.swift` | New | ~250 lines: fetchTables, fetchColumns, fetchPrimaryKeys, fetchTableData, executeQuery |
-| `Services/SQLite/SQLiteResultMapper.swift` | New | ~100 lines: Row → TableRow, Row → ColumnInfo, Row → TableInfo |
+| `Services/SQLite/SQLiteResultMapper.swift` | New | ~120 lines: GRDB Row → TypedQueryResult (SQLiteValue, positional), Row → ColumnInfo, Row → TableInfo |
+| `Models/SQLiteValue.swift` | New | ~30 lines: SQLiteValue enum (null/integer/real/text/blob) |
+| `Models/ResultRow.swift` | New | ~20 lines: ResultRow struct (id: UUID, values: [SQLiteValue]) with toDisplayRow() |
+| `Models/ResultColumn.swift` | New | ~15 lines: ResultColumn struct (name, declaredType) |
+| `Models/TypedQueryResult.swift` | New | ~20 lines: TypedQueryResult (columns, rows, executionTime, affectedRows) |
 | `Models/DatabaseFileProfile.swift` | New | ~40 lines: SwiftData model with id, name, filePath, bookmarkData, timestamps |
 | `Errors/FileOpenError.swift` | New | ~30 lines: enum with file-access error cases |
 | `Protocols/ConnectionManagerProtocol.swift` | Edit | Change connect() signature: host/port/… → filePath/readOnly |
