@@ -200,7 +200,18 @@ extension SQLiteDatabaseService: DatabaseServiceProtocol {
         table: String,
         primaryKeyColumns: [String],
         rows: [TableRow]
-    ) async throws { throw FileOpenError.notSupported }
+    ) async throws {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        let affected = try await connectionManager.withDatabaseWrite { db in
+            try SQLiteRowOperations.deleteRows(
+                db: db,
+                table: table,
+                primaryKeyColumns: primaryKeyColumns,
+                rows: rows
+            )
+        }
+        DebugLog.print("Deleted \(affected) rows from \(table)")
+    }
 
     func updateRow(
         schema: String,
@@ -208,7 +219,36 @@ extension SQLiteDatabaseService: DatabaseServiceProtocol {
         primaryKeyColumns: [String],
         originalRow: TableRow,
         updatedValues: [String: RowEditValue]
-    ) async throws { throw FileOpenError.notSupported }
+    ) async throws {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        let affected = try await connectionManager.withDatabaseWrite { db in
+            try SQLiteRowOperations.updateRow(
+                db: db,
+                table: table,
+                primaryKeyColumns: primaryKeyColumns,
+                originalRow: originalRow,
+                updatedValues: updatedValues
+            )
+        }
+        guard affected > 0 else {
+            throw FileOpenError.unknownError(
+                "No rows were updated. The row may have been modified by another process."
+            )
+        }
+        DebugLog.print("Updated row in \(table)")
+    }
+
+    // MARK: - SQLite-Specific Write Operations (not on protocol)
+
+    /// Insert a new row into the given table.
+    /// This method is SQLite-specific and is not part of `DatabaseServiceProtocol`.
+    func insertRow(table: String, values: [String: RowEditValue]) async throws {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        try await connectionManager.withDatabaseWrite { db in
+            _ = try SQLiteRowOperations.insertRow(db: db, table: table, values: values)
+        }
+        DebugLog.print("Inserted row into \(table)")
+    }
 
     func fetchPrimaryKeyColumns(schema: String, table: String) async throws -> [String] {
         return try await fetchPrimaryKeys(table: table)
