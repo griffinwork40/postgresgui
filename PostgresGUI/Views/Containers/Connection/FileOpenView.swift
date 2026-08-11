@@ -20,10 +20,16 @@ struct FileOpenView: View {
     @State private var viewModel = FileOpenViewModel()
     @State private var pendingFilePath: String?
 
-    // Sort by createdAt (non-optional) descending; once lastOpenedAt is non-optional
-    // this can switch to sort: \DatabaseFileProfile.lastOpenedAt, order: .reverse
-    @Query(sort: \DatabaseFileProfile.createdAt, order: .reverse)
-    private var recentProfiles: [DatabaseFileProfile]
+    // Fetch all profiles unsorted; sort in-body on the optional lastOpenedAt so we
+    // get "most recently opened first" semantics without relying on SwiftData's
+    // inconsistent handling of optional keypath sorts.
+    @Query private var recentProfiles: [DatabaseFileProfile]
+
+    private var sortedRecentProfiles: [DatabaseFileProfile] {
+        recentProfiles.sorted {
+            ($0.lastOpenedAt ?? .distantPast) > ($1.lastOpenedAt ?? .distantPast)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -42,7 +48,7 @@ struct FileOpenView: View {
                 Divider()
 
                 // MARK: Recent files
-                if recentProfiles.isEmpty {
+                if sortedRecentProfiles.isEmpty {
                     emptyRecentFiles
                 } else {
                     recentFilesList
@@ -131,7 +137,7 @@ struct FileOpenView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 6)
 
-            List(recentProfiles) { profile in
+            List(sortedRecentProfiles) { profile in
                 FileOpenRecentRow(profile: profile) {
                     pendingFilePath = profile.filePath
                 }
