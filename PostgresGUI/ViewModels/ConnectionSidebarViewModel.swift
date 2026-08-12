@@ -27,13 +27,13 @@ class ConnectionSidebarViewModel {
 
     // MARK: - Dependencies
 
-    private let appState: AppState
+    let appState: AppState
     private let tabManager: TabManager
     private let loadingState: LoadingState
     private let modelContext: ModelContext
     private let keychainService: KeychainServiceProtocol
     private let userDefaults: UserDefaultsProtocol
-    private let tableRefreshService: TableRefreshServiceProtocol
+    let tableRefreshService: TableRefreshServiceProtocol
 
     // MARK: - State
 
@@ -47,8 +47,8 @@ class ConnectionSidebarViewModel {
 
     // Connection state
     var connectionToDelete: ConnectionProfile?
-    private var manualRefreshTask: Task<Void, Never>?
-    private var manualRefreshRequestId: Int = 0
+    var manualRefreshTask: Task<Void, Never>?
+    var manualRefreshRequestId: Int = 0
 
     /// Static flag to ensure auto-restore only happens once per app session
     private static var hasRestoredConnectionGlobally = false
@@ -322,83 +322,4 @@ class ConnectionSidebarViewModel {
         await loadTables(for: database)
     }
 
-    /// Triggered by sidebar toolbar refresh button.
-    /// Uses latest-wins semantics for rapid repeated clicks.
-    func refreshOnDemandFromToolbar() async {
-        manualRefreshRequestId += 1
-        let requestId = manualRefreshRequestId
-        let hadExistingTask = manualRefreshTask != nil
-
-        if hadExistingTask {
-            DebugLog.print(
-                "🔄 [ConnectionSidebarViewModel] Cancelling previous manual refresh before starting request \(requestId) " +
-                refreshStateSummary()
-            )
-        }
-        manualRefreshTask?.cancel()
-
-        DebugLog.print(
-            "🔄 [ConnectionSidebarViewModel] Manual refresh requested " +
-            "(id: \(requestId), hadExistingTask: \(hadExistingTask)) " +
-            refreshStateSummary()
-        )
-        manualRefreshTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            let startedAt = Date()
-            DebugLog.print(
-                "🔄 [ConnectionSidebarViewModel] Manual refresh started " +
-                "(id: \(requestId)) " +
-                self.refreshStateSummary()
-            )
-            await self.tableRefreshService.refresh(appState: self.appState)
-            let duration = Date().timeIntervalSince(startedAt)
-            if Task.isCancelled {
-                DebugLog.print(
-                    "⚠️ [ConnectionSidebarViewModel] Manual refresh task cancelled " +
-                    "(id: \(requestId), duration: \(String(format: "%.3f", duration))s) " +
-                    self.refreshStateSummary()
-                )
-            } else {
-                DebugLog.print(
-                    "✅ [ConnectionSidebarViewModel] Manual refresh task returned from service " +
-                    "(id: \(requestId), duration: \(String(format: "%.3f", duration))s) " +
-                    self.refreshStateSummary()
-                )
-            }
-        }
-        await manualRefreshTask?.value
-
-        if manualRefreshRequestId == requestId {
-            manualRefreshTask = nil
-            DebugLog.print(
-                "🏁 [ConnectionSidebarViewModel] Manual refresh lifecycle finished " +
-                "(id: \(requestId)) " +
-                refreshStateSummary()
-            )
-        } else {
-            DebugLog.print(
-                "↪️ [ConnectionSidebarViewModel] Manual refresh request \(requestId) completed " +
-                "after a newer request became active " +
-                refreshStateSummary()
-            )
-        }
-    }
-
-    private func refreshStateSummary() -> String {
-        let connectionName = appState.connection.currentConnection?.name ?? "nil"
-        let selectedDatabase = appState.connection.selectedDatabase?.name ?? "nil"
-        let selectedTable = appState.connection.selectedTable?.id ?? "nil"
-        let connectedDatabase = appState.connection.databaseService.connectedDatabase ?? "nil"
-        return (
-            "(connection: \(connectionName), " +
-            "selectedDB: \(selectedDatabase), " +
-            "selectedTable: \(selectedTable), " +
-            "connectedDB: \(connectedDatabase), " +
-            "isConnected: \(appState.connection.databaseService.isConnected), " +
-            "isLoadingTables: \(appState.connection.isLoadingTables), " +
-            "databases: \(appState.connection.databases.count), " +
-            "tables: \(appState.connection.tables.count), " +
-            "schemas: \(appState.connection.schemas.count))"
-        )
-    }
 }
