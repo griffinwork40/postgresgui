@@ -65,6 +65,7 @@ struct QueryResultsComponent: View {
     let onNextPage: () -> Void
     var onDeleteKeyPressed: (() -> Void)?
     var onSpaceKeyPressed: (() -> Void)?
+    var onJSONCellTapped: ((_ column: String, _ value: String) -> Void)?
     
     // Local state for sorting
     @State private var sortOrder: [TableRowComparator] = []
@@ -190,11 +191,13 @@ struct QueryResultsComponent: View {
             Table(sortedResults, selection: $selectedRowIDs, sortOrder: $sortOrder) {
                 TableColumnForEach(columnNames, id: \.self) { columnName in
                     TableColumn(columnName, sortUsing: TableRowComparator(columnName: columnName)) { row in
-                        Text(formatValue(row.values[columnName] ?? nil))
-                            .font(.system(.body, design: .monospaced))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                            .textSelection(.enabled)
+                        ResultCellView(
+                            value: formatValue(row.values[columnName] ?? nil),
+                            rawValue: row.values[columnName] ?? nil,
+                            onJSONTapped: onJSONCellTapped.map { callback in
+                                { value in callback(columnName, value) }
+                            }
+                        )
                     }
                     .width(min: Constants.ColumnWidth.tableColumnMin)
                 }

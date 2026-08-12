@@ -15,9 +15,21 @@ struct DetailContentModals: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // JSON Viewer Sheet
+            // JSON Viewer Sheet (row-level)
             .sheet(isPresented: $viewModel.showJSONView) {
                 JSONViewerView(selectedRowIDs: appState.query.selectedRowIDs)
+            }
+            // Cell JSON Inspector Sheet
+            .sheet(isPresented: $viewModel.showCellJSONInspector) {
+                if let column = viewModel.cellJSONColumnName,
+                   let raw = viewModel.cellJSONRawValue,
+                   let pretty = viewModel.cellJSONPrettyValue {
+                    CellJSONInspectorView(
+                        columnName: column,
+                        rawValue: raw,
+                        prettyJSON: pretty
+                    )
+                }
             }
             // Row Editor Sheet
             .sheet(isPresented: Binding(

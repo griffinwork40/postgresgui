@@ -15,6 +15,7 @@ struct QueryResultsView: View {
     var searchText: String = ""
     var onDeleteKeyPressed: (() -> Void)?
     var onSpaceKeyPressed: (() -> Void)?
+    var onJSONCellTapped: ((_ column: String, _ value: String) -> Void)?
 
     /// Whether the current query (for this saved query) is executing
     private var isCurrentQueryExecuting: Bool {
@@ -74,7 +75,8 @@ struct QueryResultsView: View {
                 viewModel?.goToNextPage()
             },
             onDeleteKeyPressed: onDeleteKeyPressed,
-            onSpaceKeyPressed: onSpaceKeyPressed
+            onSpaceKeyPressed: onSpaceKeyPressed,
+            onJSONCellTapped: onJSONCellTapped
         )
         .onAppear {
             viewModel = QueryResultsViewModel(appState: appState, tabManager: tabManager)

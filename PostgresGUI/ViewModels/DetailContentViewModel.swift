@@ -25,6 +25,13 @@ class DetailContentViewModel {
     var showJSONView = false
     var showDeleteConfirmation = false
     var showRowEditor = false
+    var showCellJSONInspector = false
+
+    // MARK: - Cell JSON Inspector State
+
+    var cellJSONColumnName: String?
+    var cellJSONRawValue: String?
+    var cellJSONPrettyValue: String?
 
     // MARK: - Editing State
 
@@ -118,6 +125,18 @@ class DetailContentViewModel {
         case .failure(let error):
             jsonViewError = error.localizedDescription
         }
+    }
+
+    // MARK: - Cell JSON Inspector
+
+    func openCellJSONInspector(column: String, rawValue: String) {
+        let result = JSONDetector.detect(rawValue)
+        guard result.isJSON, let pretty = result.prettyPrinted else { return }
+
+        cellJSONColumnName = column
+        cellJSONRawValue = rawValue
+        cellJSONPrettyValue = pretty
+        showCellJSONInspector = true
     }
 
     // MARK: - Edit Operations
