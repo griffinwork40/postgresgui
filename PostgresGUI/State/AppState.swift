@@ -19,6 +19,7 @@ class AppState {
     let navigation: NavigationState
     let connection: ConnectionState
     let query: QueryState
+    let safeMode: SafeModeState
 
     // MARK: - Coordinators
 
@@ -51,6 +52,7 @@ class AppState {
         self.navigation = nav
         self.connection = conn
         self.query = q
+        self.safeMode = SafeModeState()
         self.metadataResolver = resolver
         self.tableBrowse = TableBrowseCoordinator(
             connection: conn,

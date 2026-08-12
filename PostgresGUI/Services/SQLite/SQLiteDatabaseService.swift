@@ -15,12 +15,13 @@ import GRDB
 
 @MainActor
 class SQLiteDatabaseService {
-    private let connectionManager = SQLiteConnectionManager()
+    /// Internal access so same-module extensions (e.g. +Attached) can reach these.
+    let connectionManager = SQLiteConnectionManager()
     private let queryExecutor = SQLiteQueryExecutor()
 
     // MARK: - Connection State
 
-    private var _isConnected: Bool = false
+    var _isConnected: Bool = false
     private var _currentFilePath: String?
 
     var isConnected: Bool { _isConnected }
@@ -185,6 +186,39 @@ class SQLiteDatabaseService {
             try db.execute(sql: "ANALYZE")
         }
     }
+
+    // MARK: - FTS Support
+
+    /// Discover all FTS virtual tables in the connected database.
+    func fetchFTSTables() async throws -> [FTSTableInfo] {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        return try await connectionManager.withDatabase { db in
+            try FTSDetectionService.fetchFTSTables(db: db)
+        }
+    }
+
+    /// Execute a MATCH query against an FTS virtual table.
+    ///
+    /// - Parameters:
+    ///   - table: The FTS table to search.
+    ///   - query: The FTS MATCH expression (e.g. "hello world").
+    /// - Returns:  A `QueryResult` with matched rows and timing information.
+    func searchFTS(table: FTSTableInfo, query: String) async throws -> QueryResult {
+        guard _isConnected else { throw FileOpenError.notConnected }
+        let sql = FTSDetectionService.buildMatchSQL(table: table, query: query)
+        let escapedQuery = query.replacingOccurrences(of: "'", with: "''")
+        let boundSQL = sql.replacingOccurrences(of: "?", with: "'\(escapedQuery)'")
+        let start = Date()
+        do {
+            let (rows, columns) = try await executeQuery(boundSQL)
+            let duration = Date().timeIntervalSince(start)
+            return QueryResult.success(rows: rows, columnNames: columns, executionTime: duration)
+        } catch {
+            let duration = Date().timeIntervalSince(start)
+            return QueryResult.failure(error: error, executionTime: duration)
+        }
+    }
+
 }
 
 // MARK: - DatabaseServiceProtocol Conformance
@@ -304,5 +338,6 @@ extension SQLiteDatabaseService: DatabaseServiceProtocol {
     func connectFile(filePath: String, readOnly: Bool) async throws {
         try await connect(filePath: filePath, readOnly: readOnly)
     }
+
 }
 

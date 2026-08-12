@@ -94,4 +94,6 @@ extension Notification.Name {
     static let showKeyboardShortcuts = Notification.Name("showKeyboardShortcuts")
     static let showHelp = Notification.Name("showHelp")
     static let showDiscovery = Notification.Name("showDiscovery")
+    static let runQueryAfterConfirmation = Notification.Name("runQueryAfterConfirmation")
+    static let openDroppedSQLiteFile = Notification.Name("openDroppedSQLiteFile")
 }

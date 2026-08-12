@@ -20,6 +20,13 @@ struct MainSplitView: View {
     @State private var viewModel: DetailContentViewModel?
     @State private var selectedQueryIDs: Set<SavedQuery.ID> = []
     @State private var showHealthInspector: Bool = false
+    @State private var showSchemaVisualizer: Bool = false
+
+    // MARK: - Safe Mode / Confirmation State
+    /// SQL awaiting user confirmation before execution.
+    @State private var pendingConfirmationSQL: String? = nil
+    /// SQL blocked outright by Safe Mode (DDL while safe mode is ON).
+    @State private var blockedSQL: String? = nil
 
     /// Window title: shows the SQLite filename when a file is open, or the Postgres database name.
     private var navigationTitleText: String {
@@ -94,7 +101,7 @@ struct MainSplitView: View {
                 if let viewModel = viewModel {
                     DetailContentToolbar(viewModel: viewModel)
                 }
-                // Health Inspector toolbar button — only shown when a SQLite file is open
+                // Health Inspector + Schema Visualizer — only shown when a SQLite file is open
                 if appState.connection.activeConnection?.sqliteProfile != nil {
                     ToolbarItem(placement: .automatic) {
                         Button {
@@ -104,7 +111,17 @@ struct MainSplitView: View {
                         }
                         .help("Open the Database Health Inspector")
                     }
+                    ToolbarItem(placement: .automatic) {
+                        Button {
+                            showSchemaVisualizer = true
+                        } label: {
+                            Label("Schema Relationships", systemImage: "arrow.triangle.branch")
+                        }
+                        .help("Open the Schema Relationship Visualizer")
+                    }
                 }
+                // Safe Mode toggle — always visible
+                SafeModeToolbarButton(safeModeState: appState.safeMode)
             }
             .onAppear {
                 if viewModel == nil {
@@ -127,6 +144,11 @@ struct MainSplitView: View {
         .sheet(isPresented: $showHealthInspector) {
             if let sqliteService = appState.connection.databaseService as? SQLiteDatabaseService {
                 HealthInspectorView(service: sqliteService)
+            }
+        }
+        .sheet(isPresented: $showSchemaVisualizer) {
+            if let sqliteService = appState.connection.databaseService as? SQLiteDatabaseService {
+                SchemaVisualizationView(service: sqliteService)
             }
         }
         .overlay(alignment: .bottomTrailing) {
@@ -162,6 +184,31 @@ struct MainSplitView: View {
         .animation(
             .spring(response: 0.35, dampingFraction: 0.7),
             value: appState.query.mutationToast != nil)
+        // Safe Mode: confirmation dialog for dangerous SQL
+        .queryConfirmation(
+            state: appState.safeMode,
+            pendingSQL: $pendingConfirmationSQL
+        ) {
+            // Re-run the query after the user confirms — the QueryEditorView
+            // handles the actual execution; this just triggers a re-run.
+            NotificationCenter.default.post(
+                name: .runQueryAfterConfirmation,
+                object: nil
+            )
+        }
+        // Safe Mode: blocked alert for outright-blocked DDL
+        .safeModeBlocked(sql: $blockedSQL)
+        // Drag-and-drop: open a SQLite file by dropping it on the window
+        .sqliteDropTarget { url in
+            let profile = DatabaseFileProfile(
+                name: url.deletingPathExtension().lastPathComponent,
+                filePath: url.path
+            )
+            NotificationCenter.default.post(
+                name: .openDroppedSQLiteFile,
+                object: profile
+            )
+        }
     }
 }
 

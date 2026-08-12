@@ -160,6 +160,46 @@ struct SQLiteQueryExecutor {
         }
     }
 
+    /// Execute a parameterized SELECT query with arguments.
+    /// Used by FTS MATCH searches where the query term is a bound parameter.
+    func executeQueryWithArgs(
+        db: Database,
+        sql: String,
+        arguments: StatementArguments
+    ) throws -> TypedQueryResult {
+        let startTime = Date()
+        let statement = try db.makeStatement(sql: sql)
+        try statement.setArguments(arguments)
+
+        let columnCount = statement.columnCount
+        var columns: [ResultColumn] = []
+        for i in 0..<columnCount {
+            columns.append(ResultColumn(
+                name: statement.columnNames[i],
+                declaredType: nil
+            ))
+        }
+
+        let cursor = try Row.fetchCursor(statement)
+        var resultRows: [ResultRow] = []
+        while let row = try cursor.next() {
+            var values: [SQLiteValue] = []
+            values.reserveCapacity(columnCount)
+            for i in 0..<columnCount {
+                let dbValue = row[i] as DatabaseValue
+                values.append(dbValue.toSQLiteValue())
+            }
+            resultRows.append(ResultRow(values: values))
+        }
+
+        let duration = Date().timeIntervalSince(startTime)
+        return TypedQueryResult.success(
+            columns: columns,
+            rows: resultRows,
+            executionTime: duration
+        )
+    }
+
     // MARK: - Private Helpers
 
     /// Execute a SELECT and map results to TypedQueryResult with SQLiteValue preservation.
