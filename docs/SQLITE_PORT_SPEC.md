@@ -1,10 +1,10 @@
 # SQLiteGUI — Native macOS SQLite Inspector
 
-## Specification for Porting PostgresGUI to SQLite
+## Specification for Porting Tarn to SQLite
 
 **Working name:** SQLiteGUI
-**Source repository:** [github.com/griffinwork40/postgresgui](https://github.com/griffinwork40/postgresgui)
-**Upstream:** [github.com/postgresgui/postgresgui](https://github.com/postgresgui/postgresgui)
+**Source repository:** [github.com/griffinwork40/tarn](https://github.com/griffinwork40/tarn)
+**Upstream:** [github.com/tarn/tarn](https://github.com/tarn/tarn)
 **Date:** 2026-08-11
 **Status:** Draft specification — implementation not yet started
 
@@ -39,7 +39,7 @@
 
 ## 1. Executive Summary
 
-PostgresGUI is a well-architected native macOS PostgreSQL client built with Swift and SwiftUI, targeting macOS 26. The codebase is 27,244 lines of Swift across 155 files with a clean protocol-oriented architecture that separates database-specific implementation from UI and business logic.
+Tarn is a well-architected native macOS PostgreSQL client built with Swift and SwiftUI, targeting macOS 26. The codebase is 27,244 lines of Swift across 155 files with a clean protocol-oriented architecture that separates database-specific implementation from UI and business logic.
 
 **The codebase is highly reusable for an SQLite port.** The developers anticipated backend swapping — every PostgreSQL-specific type lives behind a protocol. The migration is concentrated in a small, well-defined surface:
 
@@ -64,7 +64,7 @@ The core rewrite is just **4 files** (~1,400 lines) in the `Services/Postgres/` 
 
 ### 2.1 High-Level Architecture
 
-PostgresGUI follows a layered MVVM architecture with protocol-oriented dependency injection:
+Tarn follows a layered MVVM architecture with protocol-oriented dependency injection:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -106,7 +106,7 @@ PostgresGUI follows a layered MVVM architecture with protocol-oriented dependenc
 
 **Actor isolation.** The connection manager is an `actor` (thread-safe by design). Services are `@MainActor`. State classes are `@Observable @MainActor`. This provides strong concurrency safety.
 
-**SwiftData persistence.** User data (connections, saved queries, query folders, tab state, query history) is stored via SwiftData with versioned schema migrations (`PostgresGUISchemaV1` → `V2`).
+**SwiftData persistence.** User data (connections, saved queries, query folders, tab state, query history) is stored via SwiftData with versioned schema migrations (`TarnSchemaV1` → `V2`).
 
 **Multi-statement execution.** The SQL statement splitter handles semicolons, quoted strings, dollar-quoting (PostgreSQL-specific), and comments. Multi-statement queries are split and executed sequentially.
 
@@ -178,10 +178,10 @@ Tab state syncs bidirectionally between `TabViewModel` (in-memory) and `TabState
 ## 3. Repository / Component Map
 
 ```
-postgresgui/
-├── PostgresGUI/
-│   ├── PostgresGUIApp.swift              # App entry point, scene setup, menu commands
-│   ├── PostgresGUI.entitlements          # Sandbox, network, keychain entitlements
+tarn/
+├── Tarn/
+│   ├── TarnApp.swift              # App entry point, scene setup, menu commands
+│   ├── Tarn.entitlements          # Sandbox, network, keychain entitlements
 │   │
 │   ├── Models/                           # Domain models
 │   │   ├── ColumnInfo.swift              # Column metadata (name, type, nullable, PK, FK)
@@ -332,12 +332,12 @@ postgresgui/
 │   │       └── TabServiceProtocol.swift
 │   │
 │   ├── Types/                            # Domain value types
-│   │   ├── PostgresConnectionString.swift  ← REMOVE
+│   │   ├── ConnectionString.swift  ← REMOVE
 │   │   ├── SSLMode.swift                   ← REMOVE
 │   │   └── SSHAuthMethod.swift             ← REMOVE
 │   │
 │   ├── Errors/                           # Error types
-│   │   ├── PostgresError.swift             ← REMOVE
+│   │   ├── TarnError.swift             ← REMOVE
 │   │   ├── SSHTunnelError.swift            ← REMOVE
 │   │   ├── ConnectionError.swift           ← REPLACE
 │   │   ├── DatabaseError.swift
@@ -368,11 +368,11 @@ postgresgui/
 │   │   └── Timeout.swift
 │   │
 │   ├── Persistence/
-│   │   └── PostgresGUIModelContainer.swift ← ADAPT (rename)
+│   │   └── TarnModelContainer.swift ← ADAPT (rename)
 │   │
 │   └── Assets.xcassets/                  # App icon, accent color, logo
 │
-├── PostgresGUITests/                     # 17 test files, ~2,200 lines
+├── TarnTests/                     # 17 test files, ~2,200 lines
 │   ├── AppStateTests.swift               # 28 tests — race conditions, pagination
 │   ├── ConnectionSidebarViewModelTests.swift
 │   ├── ConnectionStateTests.swift
@@ -391,10 +391,10 @@ postgresgui/
 │   ├── TableBrowseResultCompactorTests.swift
 │   └── TableRefreshServiceTests.swift     ← ADAPT
 │
-├── PostgresGUIUITests/
-│   └── PostgresGUIUITests.swift          # Empty test case
+├── TarnUITests/
+│   └── TarnUITests.swift          # Empty test case
 │
-├── PostgresGUI.xcodeproj/
+├── Tarn.xcodeproj/
 │   ├── project.pbxproj                   # Xcode project (macOS 26, Swift 5)
 │   └── project.xcworkspace/
 │       └── xcshareddata/swiftpm/
@@ -426,7 +426,7 @@ Removing PostgresNIO and Citadel eliminates **14 transitive SPM packages**. The 
 | `PostgresDatabaseConnection.swift` | `PostgresNIO`, `NIOCore`, `NIOFoundationCompat` | `PostgresConnection`, `PostgresRow`, `PostgresCell`, `PostgresBindings`, `PostgresQuery`, `PostgresRowSequence` |
 | `PostgresConnectionManager.swift` | `PostgresNIO`, `NIOCore`, `NIOPosix`, `NIOSSL` | `PostgresConnection`, `PSQLError`, `MultiThreadedEventLoopGroup`, `NIOSSLContext`, `TLSConfiguration` |
 | `PostgresResultMapper.swift` | `PostgresNIO` | `PostgresDatabaseRow` downcast, `PostgresDecodable`, `PostgresCell.bytes` |
-| `PostgresError.swift` | `PostgresNIO` | `PSQLError`, `error.serverInfo` |
+| `TarnError.swift` | `PostgresNIO` | `PSQLError`, `error.serverInfo` |
 
 ### 4.3 PostgreSQL-Specific SQL
 
@@ -472,7 +472,7 @@ All view primitives (Badge, LoadingOverlay, ResizableSplitView, LineNumberRulerV
 **ADAPT** — 38 files (~8,200 lines) require surgical edits:
 
 - **Models:** `TableInfo.swift` (change default schema from `"public"` to `"main"`)
-- **State:** `AppState.swift` (remove `setSchemaSearchPath`), `ConnectionState.swift` (minor), `NavigationState.swift` (rename `isShowingCreateDatabase`), `QueryState.swift` (replace `PostgresError.extractDetailedMessage`)
+- **State:** `AppState.swift` (remove `setSchemaSearchPath`), `ConnectionState.swift` (minor), `NavigationState.swift` (rename `isShowingCreateDatabase`), `QueryState.swift` (replace `TarnError.extractDetailedMessage`)
 - **ViewModels:** Several need connection form and schema reference updates
 - **Views:** Sidebar, toolbar, settings, welcome view need branding/connection UI changes
 - **Services:** `DatabaseService`, `ConnectionService`, `QueryService`, `TableRefreshService` need connect-signature and PostgreSQL-SQL removal
@@ -493,7 +493,7 @@ All view primitives (Badge, LoadingOverlay, ResizableSplitView, LineNumberRulerV
 | `Views/Containers/Connection/ConnectionFormView.swift` | `Views/Containers/File/FileOpenView.swift` | Server form → file picker |
 | `ViewModels/ConnectionFormViewModel.swift` | `ViewModels/FileOpenViewModel.swift` | Connection validation → file validation |
 | `Views/Components/Connection/ConnectionDatabasePicker.swift` | *(simplify to file picker only)* | Server+DB picker → file picker |
-| `Persistence/PostgresGUIModelContainer.swift` | `Persistence/SQLiteGUIModelContainer.swift` | Rename + swap models |
+| `Persistence/TarnModelContainer.swift` | `Persistence/SQLiteGUIModelContainer.swift` | Rename + swap models |
 
 **REMOVE** — 23 files (~1,800 lines) to delete:
 
@@ -503,20 +503,20 @@ All view primitives (Badge, LoadingOverlay, ResizableSplitView, LineNumberRulerV
 | `Services/SSH/SSHKeyParser.swift` (614 lines) | No SSH for SQLite |
 | `Services/SSH/RSASHA512.swift` (304 lines) | No SSH for SQLite |
 | `Services/Protocols/SSHTunnelManagerProtocol.swift` (37 lines) | No SSH for SQLite |
-| `Types/PostgresConnectionString.swift` | No connection strings |
+| `Types/ConnectionString.swift` | No connection strings |
 | `Types/SSLMode.swift` | No SSL/TLS |
 | `Types/SSHAuthMethod.swift` | No SSH |
-| `Errors/PostgresError.swift` | PostgresNIO dependency |
+| `Errors/TarnError.swift` | PostgresNIO dependency |
 | `Errors/SSHTunnelError.swift` | No SSH |
 | `Utilities/QueryWrapping.swift` | `to_jsonb()` workaround |
 | `Utilities/QueryResultNormalizer.swift` | Inverse of `to_jsonb()` |
 | `Views/Components/Sidebar/SchemaPicker.swift` | No schemas |
 | `Views/Components/Tables/SchemaGroupView.swift` | No schema groups |
 | `Views/Containers/Database/CreateDatabaseView.swift` | No CREATE DATABASE |
-| `PostgresGUITests/ConnectionStringParserTests.swift` | PG connection strings |
-| `PostgresGUITests/DatabaseServiceDeleteDatabaseTests.swift` | PG maintenance DB logic |
-| `PostgresGUITests/QueryResultNormalizerTests.swift` | `to_jsonb()` inverse |
-| `PostgresGUITests/SSHKeyParserTests.swift` | SSH infrastructure |
+| `TarnTests/ConnectionStringParserTests.swift` | PG connection strings |
+| `TarnTests/DatabaseServiceDeleteDatabaseTests.swift` | PG maintenance DB logic |
+| `TarnTests/QueryResultNormalizerTests.swift` | `to_jsonb()` inverse |
+| `TarnTests/SSHKeyParserTests.swift` | SSH infrastructure |
 
 ### 5.2 Dependency Impact
 
@@ -592,7 +592,7 @@ SwiftUI Views ──→ ViewModels ──→ State ──→ Services (protocol-
 ### 6.2 New File Structure
 
 ```
-PostgresGUI/                              → rename to SQLiteGUI/ (Phase N)
+Tarn/                              → rename to SQLiteGUI/ (Phase N)
 ├── Services/
 │   ├── SQLite/                           ← NEW directory (replaces Postgres/)
 │   │   ├── SQLiteConnectionManager.swift
@@ -1788,7 +1788,7 @@ The existing protocol-based mock infrastructure (`MockDatabaseService`, `MockCon
 ## 17. Migration Plan
 
 ### Phase 0: Preparation (Build Baseline)
-- Configure code signing and verify the existing PostgresGUI builds on macOS 26
+- Configure code signing and verify the existing Tarn builds on macOS 26
 - Run existing tests to establish baseline (expecting all pass)
 - Create a feature branch for the SQLite port
 
@@ -1879,7 +1879,7 @@ The repository uses the **O'Saasy license** — a variant of MIT with a SaaS res
 ### 18.3 Requirements
 
 1. Include the original copyright notice and permission notice in the distributed application (in About dialog, LICENSE file, or similar)
-2. Do not offer the derivative as a SaaS/cloud service competing with PostgresGUI
+2. Do not offer the derivative as a SaaS/cloud service competing with Tarn
 3. A native macOS desktop application distributed via GitHub or Mac App Store is fully compliant
 
 ---
@@ -1929,7 +1929,7 @@ Some tables cannot be edited if they lack explicit primary keys and don't have a
 
 3. **Should we support opening databases from URLs (e.g., `sqlitegui://open?path=...`)?** This is useful for integration with other tools. Deferred to post-MVP.
 
-4. **Should we support creating new empty databases?** The PostgresGUI has `CREATE DATABASE` — the SQLite equivalent is creating a new empty `.sqlite` file. Low effort to implement; decide whether it's in MVP scope.
+4. **Should we support creating new empty databases?** The Tarn has `CREATE DATABASE` — the SQLite equivalent is creating a new empty `.sqlite` file. Low effort to implement; decide whether it's in MVP scope.
 
 5. **Should we preserve the multi-tab architecture or simplify to single-tab?** The existing tab system is database-agnostic and works well. Recommend keeping it — each tab can have a different query context against the same database file, which is useful for developers.
 
@@ -1956,8 +1956,8 @@ Some tables cannot be edited if they lack explicit primary keys and don't have a
 | Adapt connection protocol | Edit signature | `Protocols/ConnectionManagerProtocol.swift` | 1 hour |
 | Adapt database service | Wire SQLite implementations | `Services/DatabaseService.swift` | 2 hours |
 | File open view | New (simple file picker) | `Views/Containers/File/FileOpenView.swift` | 2 hours |
-| Adapt app entry point | Wire new profile model | `PostgresGUIApp.swift` | 1 hour |
-| Tests | New connection + execution tests | `PostgresGUITests/SQLite*Tests.swift` | 3 hours |
+| Adapt app entry point | Wire new profile model | `TarnApp.swift` | 1 hour |
+| Tests | New connection + execution tests | `TarnTests/SQLite*Tests.swift` | 3 hours |
 | **Total** | | | **~24 hours** |
 | **Completion criteria** | Launch app → Open .sqlite file → Type SQL → See results | | |
 
@@ -2106,7 +2106,7 @@ This validates the full vertical stack (UI → ViewModel → State → Service �
 9. **Adapt: `Services/DatabaseService.swift`** — wire SQLite implementations instead of PostgreSQL defaults
 10. **Adapt: `Views/Containers/Connection/ConnectionFormView.swift`** — replace server form with file picker (or create new `FileOpenView`)
 11. **Adapt: `Views/Containers/Sidebar/ConnectionsDatabasesSidebar.swift`** — show flat table list (no schema grouping)
-12. **Adapt: `PostgresGUIApp.swift`** — wire new model container with `DatabaseFileProfile`
+12. **Adapt: `TarnApp.swift`** — wire new model container with `DatabaseFileProfile`
 
 ### What This Slice Explicitly Excludes
 
@@ -2163,35 +2163,35 @@ This validates the full vertical stack (UI → ViewModel → State → Service �
 | `ViewModels/ConnectionFormViewModel.swift` | Replace | File validation instead of connection validation |
 | `Views/Containers/Sidebar/ConnectionsDatabasesSidebar.swift` | Edit | Remove SchemaPicker reference |
 | `Views/Containers/Tables/TablesListView.swift` | Edit | Remove schema grouping path |
-| `PostgresGUIApp.swift` | Edit | Wire DatabaseFileProfile model |
-| `Persistence/PostgresGUIModelContainer.swift` | Edit | Register DatabaseFileProfile |
+| `TarnApp.swift` | Edit | Wire DatabaseFileProfile model |
+| `Persistence/TarnModelContainer.swift` | Edit | Register DatabaseFileProfile |
 | `Constants.swift` | Edit | Remove PostgreSQL sub-enum |
-| `PostgresGUITests/SQLiteConnectionTests.swift` | New | ~100 lines: connection + execution tests |
-| `PostgresGUITests/SQLiteQueryExecutorTests.swift` | New | ~150 lines: table discovery + data fetch tests |
+| `TarnTests/SQLiteConnectionTests.swift` | New | ~100 lines: connection + execution tests |
+| `TarnTests/SQLiteQueryExecutorTests.swift` | New | ~150 lines: table discovery + data fetch tests |
 
 ---
 
 ## Appendix: Branding Locations
 
-Places where PostgresGUI/PostgreSQL branding exists and would eventually need to change:
+Places where Tarn/PostgreSQL branding exists and would eventually need to change:
 
 | Location | Current Value | Action |
 |----------|--------------|--------|
-| `PostgresGUIApp.swift` | `Window("PostgresGUI", id: "main")` | Rename |
-| `PostgresGUIApp.swift` | `"PostgresGUI Help"` | Rename |
-| `PostgresGUIApp.swift` | `postgresgui.com/support` URL | Update/remove |
-| `project.pbxproj` | `com.mghazi.PostgresGUI` bundle ID | Change |
+| `TarnApp.swift` | `Window("Tarn", id: "main")` | Rename |
+| `TarnApp.swift` | `"Tarn Help"` | Rename |
+| `TarnApp.swift` | `tarn.com/support` URL | Update/remove |
+| `project.pbxproj` | `com.mghazi.Tarn` bundle ID | Change |
 | `Constants.swift` | `PostgreSQL` sub-enum | Rename to `Database` |
 | `SyntaxHighlightedEditor.swift` | PostgreSQL keyword list | Replace with SQLite keywords |
-| `WelcomeView.swift` | "PostgresGUI" text + logo | Update |
-| `HelpView.swift` | PostgresGUI help content | Rewrite |
-| `SettingsView.swift` | Any PostgresGUI references | Update |
+| `WelcomeView.swift` | "Tarn" text + logo | Update |
+| `HelpView.swift` | Tarn help content | Rewrite |
+| `SettingsView.swift` | Any Tarn references | Update |
 | `Assets.xcassets/Logo.imageset/` | PostgreSQL elephant mascot | Replace |
-| `Assets.xcassets/AppIcon.appiconset/` | PostgresGUI icon | Replace |
-| `PostgresGUI.entitlements` | `com.postgresgui.connections` | Update |
+| `Assets.xcassets/AppIcon.appiconset/` | Tarn icon | Replace |
+| `Tarn.entitlements` | `com.postgresgui.connections` | Update |
 | `KeychainService.swift` | `com.postgresgui.connections` service name | Update |
 | `README.md` | Entire content | Rewrite |
-| Directory: `PostgresGUI/` | Source directory name | Rename |
-| Directory: `PostgresGUITests/` | Test directory name | Rename |
-| Target: `PostgresGUI` | Xcode target name | Rename |
-| Target: `PostgresGUITests` | Xcode test target name | Rename |
+| Directory: `Tarn/` | Source directory name | Rename |
+| Directory: `TarnTests/` | Test directory name | Rename |
+| Target: `Tarn` | Xcode target name | Rename |
+| Target: `TarnTests` | Xcode test target name | Rename |

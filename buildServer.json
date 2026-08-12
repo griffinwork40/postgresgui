@@ -12,8 +12,8 @@
 	"argv": [
 		"/opt/homebrew/bin/xcode-build-server"
 	],
-	"workspace": "/Users/ghazi/Developer/postgresgui/PostgresGUI.xcodeproj/project.xcworkspace",
-	"build_root": "/Users/ghazi/Library/Developer/Xcode/DerivedData/PostgresGUI-bkiqakmxxnsogqcyiajceqbuylch",
-	"scheme": "PostgresGUI",
+	"workspace": "/Users/griffinlong/Projects/open_source/postgresgui/Tarn.xcodeproj/project.xcworkspace",
+	"build_root": "/Users/griffinlong/Library/Developer/Xcode/DerivedData/Tarn",
+	"scheme": "Tarn",
 	"kind": "xcode"
 }

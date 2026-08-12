@@ -3,7 +3,7 @@
 # Stop on first error
 set -e
 
-PBXPROJ="PostgresGUI.xcodeproj/project.pbxproj"
+PBXPROJ="Tarn.xcodeproj/project.pbxproj"
 
 if [ ! -f "$PBXPROJ" ]; then
     echo "❌ File $PBXPROJ not found. Please run this script from the project root."

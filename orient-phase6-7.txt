@@ -1,0 +1,46 @@
+SQLiteGUI — Orientation Handoff Brief
+
+Project: macOS SwiftUI SQLite browser (griffinwork40/postgresgui); Phases 1–5 + 8 complete; Phase 6 is in progress with sub-feature 6a (database discovery) done.
+
+Where we are: Main is clean at 7ad9d2a. Five Phase 6 sub-features remain unbuilt; Phase 7 not started. 49 tests passing, all production files at or under the 350-LOC ceiling.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+What shipped recently:
+
+  • Phase 6a — Database Discovery: directory scanning, magic-byte detection, WAL detection,
+    discovery UI — 12 new tests
+  • 350-LOC ceiling sprint: all 10 over-ceiling production files extracted (11 new files)
+  • PR #1 merged: AppState refactor (590→120 LOC) + Phase 5 (query plan visualization)
+  • Phase 8: PostgreSQL removal, GRDB-only build
+  • Phases 3–4: data editing + health inspector
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Memory pointers:
+
+  • Fact #1827 — current canonical project state (phase/LOC/PR reference)
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Candidate directions — Phase 6 remaining + Phase 7:
+
+  1. Phase 6 ordering: FTS support is the highest-differentiation user-visible feature (~4h).
+     BLOB/JSON inspection are self-contained panels (~5h, ~3h). Should FTS lead the next sprint
+     for max user-visible value, or should the simpler JSON inspection go first as a warmup?
+
+  2. Schema visualization scope: The spec offers list/tree (MVP, ~6h) vs. force-directed graph
+     (more useful, significantly more work). Is this decision worth making now, or defer until
+     that sub-feature starts?
+
+  3. Attached databases timing: ATTACH/DETACH requires sidebar UI changes that may ripple wider
+     than the inspector features. Should it land before or after the self-contained panels
+     (FTS/BLOB/JSON)?
+
+  4. Phase 7 bleed-in: WAL checkpoint safety warnings (spec §9.2) are called out in Phase 6 WAL
+     work but are philosophically Phase 7 (safety). Worth landing them during Phase 6 WAL work
+     to avoid revisiting, or keep phases cleanly separated?
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Next session: Run /ground-state first, then propose a plan.
