@@ -52,6 +52,11 @@ struct QueryEditorView: View {
             },
             onShowHistory: {
                 isShowingHistory = true
+            },
+            onExplainQuery: {
+                Task {
+                    await viewModel?.explainQuery()
+                }
             }
         )
         .onAppear {

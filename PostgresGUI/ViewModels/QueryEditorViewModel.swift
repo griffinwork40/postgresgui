@@ -18,6 +18,7 @@ class QueryEditorViewModel {
     private let tabManager: TabManager
     private let modelContext: ModelContext
     private let queryService: QueryServiceProtocol
+    private let persistence: QueryPersistenceService
 
     // MARK: - State
 
@@ -39,7 +40,11 @@ class QueryEditorViewModel {
         self.appState = appState
         self.tabManager = tabManager
         self.modelContext = modelContext
-        // Create QueryService if not provided (for dependency injection in tests)
+        self.persistence = QueryPersistenceService(
+            appState: appState,
+            tabManager: tabManager,
+            modelContext: modelContext
+        )
         self.queryService = queryService ?? QueryService(
             databaseService: appState.connection.databaseService,
             queryState: appState.query
@@ -66,7 +71,11 @@ class QueryEditorViewModel {
                 }
                 tabManager.syncActiveTabToStorage(includeCachedResults: false)
                 DebugLog.print("💾 [QueryEditorViewModel] Auto-save triggered after debounce")
-                await saveQueryWithRetry()
+                let result = await persistence.saveWithRetry()
+                if !result.success, let msg = result.errorMessage {
+                    saveErrorMessage = msg
+                    showSaveErrorAlert = true
+                }
             }
         }
 
@@ -244,89 +253,34 @@ class QueryEditorViewModel {
         }
     }
 
-    // MARK: - Query Persistence
+    // MARK: - Explain Query Plan
 
-    private func saveQueryWithRetry() async {
-        let maxRetries = 2
-        var lastError: Error?
-
-        for attempt in 1...maxRetries {
-            do {
-                try saveQuery()
-                DebugLog.print("💾 [QueryEditorViewModel] Auto-save successful")
-                return
-            } catch {
-                lastError = error
-                DebugLog.print("❌ [QueryEditorViewModel] Save attempt \(attempt)/\(maxRetries) failed: \(error)")
-                if attempt < maxRetries {
-                    DebugLog.print("💾 [QueryEditorViewModel] Retrying save in 100ms...")
-                    try? await Task.sleep(for: .milliseconds(100))
-                }
-            }
-        }
-
-        // All retries failed, show alert
-        if let error = lastError {
-            DebugLog.print("❌ [QueryEditorViewModel] All save attempts failed, showing alert")
-            saveErrorMessage = error.localizedDescription
-            showSaveErrorAlert = true
-        }
-    }
-
-    private func saveQuery() throws {
-        let queryText = appState.query.queryText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        // Don't save empty queries
-        guard !queryText.isEmpty else {
-            DebugLog.print("💾 [QueryEditorViewModel] Save skipped - empty query")
+    /// Run EXPLAIN QUERY PLAN and parse the result into a tree.
+    func explainQuery() async {
+        guard appState.connection.selectedDatabase != nil else {
+            showNoDatabaseAlert = true
             return
         }
 
-        let now = Date()
-        var savedQueryName: String?
+        let queryText = appState.query.queryText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !queryText.isEmpty else { return }
 
-        // Check if we're updating an existing saved query
-        if let existingId = appState.query.currentSavedQueryId {
-            // Update existing query
-            let descriptor = FetchDescriptor<SavedQuery>(
-                predicate: #Predicate { $0.id == existingId }
+        let explainSQL = "EXPLAIN QUERY PLAN \(queryText)"
+
+        appState.query.startQueryExecution()
+        let result = await queryService.executeQuery(explainSQL, preferredColumnOrder: nil)
+        appState.query.finishQueryExecution(with: result)
+
+        if result.isSuccess {
+            let nodes = EQPParser.parse(
+                tableRows: result.rows,
+                columnNames: result.columnNames
             )
-            if let existingQuery = try? modelContext.fetch(descriptor).first {
-                existingQuery.queryText = queryText
-                existingQuery.updatedAt = now
-                savedQueryName = existingQuery.name
-                DebugLog.print("💾 [QueryEditorViewModel] Updated existing query: \(existingQuery.name)")
-            }
-        } else {
-            // Create new saved query
-            let queryName = SavedQuery.generateName(from: queryText)
-            let savedQuery = SavedQuery(
-                name: queryName,
-                queryText: queryText,
-                connectionId: appState.connection.currentConnection?.id,
-                databaseName: appState.connection.selectedDatabase?.name
-            )
-            modelContext.insert(savedQuery)
-
-            // Update state to track this query
-            appState.query.currentSavedQueryId = savedQuery.id
-            savedQueryName = queryName
-
-            // Update tab with new saved query ID
-            tabManager.updateActiveTab(savedQueryId: savedQuery.id)
-
-            DebugLog.print("💾 [QueryEditorViewModel] Saved new query: \(queryName)")
+            appState.query.queryPlanNodes = nodes
+            appState.query.isShowingQueryPlan = !nodes.isEmpty
+            let time = QueryState.formatExecutionTime(result.executionTime)
+            appState.query.setTemporaryStatus("Explain completed in \(time)")
         }
-
-        // Update saved timestamp
-        appState.query.lastSavedAt = now
-
-        // Update query name for idle display
-        appState.query.currentQueryName = savedQueryName
-
-        // Save context - throws on failure
-        try modelContext.save()
-        DebugLog.print("💾 [QueryEditorViewModel] Context saved to SwiftData")
     }
 
     // MARK: - Private Helpers

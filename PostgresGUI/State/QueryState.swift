@@ -49,6 +49,10 @@ class QueryState {
     var selectedRowIDs: Set<UUID> = []
     var isResultsReadOnlyDueToContextMismatch: Bool = false
 
+    // Query plan state
+    var queryPlanNodes: [EQPNode] = []
+    var isShowingQueryPlan: Bool = false
+
     // In-memory cache for SavedQuery results (keyed by SavedQuery.id)
     private var savedQueryResultsCache: [UUID: CachedQueryResult] = [:]
 
