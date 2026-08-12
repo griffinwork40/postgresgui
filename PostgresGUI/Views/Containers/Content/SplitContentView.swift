@@ -12,6 +12,7 @@ struct SplitContentView: View {
     @State private var bottomPaneHeight: CGFloat = 300
     var onDeleteKeyPressed: (() -> Void)?
     var onSpaceKeyPressed: (() -> Void)?
+    var onJSONCellTapped: ((_ column: String, _ value: String) -> Void)?
 
     var body: some View {
         GeometryReader { geometry in
@@ -58,7 +59,8 @@ struct SplitContentView: View {
         } else if appState.query.showQueryResults {
             QueryResultsView(
                 onDeleteKeyPressed: onDeleteKeyPressed,
-                onSpaceKeyPressed: onSpaceKeyPressed
+                onSpaceKeyPressed: onSpaceKeyPressed,
+                onJSONCellTapped: onJSONCellTapped
             )
         } else {
             ContentUnavailableView {

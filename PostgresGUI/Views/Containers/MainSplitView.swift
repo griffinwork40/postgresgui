@@ -60,6 +60,12 @@ struct MainSplitView: View {
                                 },
                                 onSpaceKeyPressed: {
                                     viewModel.openJSONView()
+                                },
+                                onJSONCellTapped: { column, value in
+                                    viewModel.openCellJSONInspector(
+                                        column: column,
+                                        rawValue: value
+                                    )
                                 }
                             )
                         } else {
