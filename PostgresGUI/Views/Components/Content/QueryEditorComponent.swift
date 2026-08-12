@@ -22,6 +22,7 @@ struct QueryEditorComponent: View {
     let onRunQuery: () -> Void
     let onCancelQuery: () -> Void
     let onShowHistory: () -> Void
+    let onExplainQuery: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -61,6 +62,15 @@ struct QueryEditorComponent: View {
                 .foregroundColor(.secondary)
                 .padding(.leading, 8)
                 .help("View Query History")
+
+                Button(action: onExplainQuery) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(.secondary)
+                .padding(.leading, 8)
+                .help("Explain Query Plan")
+                .disabled(isExecuting)
 
                 Spacer()
 
