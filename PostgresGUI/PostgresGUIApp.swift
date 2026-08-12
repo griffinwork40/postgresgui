@@ -37,6 +37,12 @@ struct PostgresGUIApp: App {
                     Text("Close Tab")
                 }
                 .keyboardShortcut("w", modifiers: [.command])
+
+                Divider()
+
+                Button(action: showDiscoverDatabases) {
+                    Label("Discover Databases…", systemImage: "folder.badge.magnifyingglass")
+                }
             }
 
             CommandGroup(after: .appInfo) {
@@ -77,6 +83,9 @@ struct PostgresGUIApp: App {
     private func closeCurrentTab() {
         NotificationCenter.default.post(name: .closeCurrentTab, object: nil)
     }
+    private func showDiscoverDatabases() {
+        NotificationCenter.default.post(name: .showDiscovery, object: nil)
+    }
 }
 
 extension Notification.Name {
@@ -84,4 +93,5 @@ extension Notification.Name {
     static let closeCurrentTab = Notification.Name("closeCurrentTab")
     static let showKeyboardShortcuts = Notification.Name("showKeyboardShortcuts")
     static let showHelp = Notification.Name("showHelp")
+    static let showDiscovery = Notification.Name("showDiscovery")
 }

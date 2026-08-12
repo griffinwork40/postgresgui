@@ -35,6 +35,20 @@ struct WelcomeView: View {
             .tint(.primary)
             .controlSize(.large)
             .accessibilityIdentifier("openSQLiteDatabaseButton")
+
+            Button(action: showDiscovery) {
+                HStack {
+                    Text("Discover Databases...")
+                    Spacer()
+                    Image(systemName: "folder.badge.magnifyingglass")
+                }
+                .frame(minWidth: 160, maxWidth: 200)
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.glass)
+            .tint(.primary)
+            .controlSize(.large)
+            .accessibilityIdentifier("discoverDatabasesButton")
         }
         .frame(minWidth: 500, maxWidth: .infinity, minHeight: 500, maxHeight: .infinity)
         .padding(.horizontal)
@@ -44,5 +58,9 @@ struct WelcomeView: View {
     
     private func showFileOpen() {
         appState.showFileOpen()
+    }
+
+    private func showDiscovery() {
+        appState.showDiscovery()
     }
 }

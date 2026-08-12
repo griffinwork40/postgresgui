@@ -65,6 +65,18 @@ struct RootView: View {
             }
             .environment(appState)
         }
+        .sheet(isPresented: Binding(
+            get: { appState.navigation.isShowingDiscovery },
+            set: { appState.navigation.isShowingDiscovery = $0 }
+        )) {
+            DatabaseDiscoveryView { url in
+                Task { @MainActor in
+                    guard let vm = viewModel else { return }
+                    let profile = openDiscoveredDatabase(url: url, modelContext: modelContext)
+                    await vm.connectSQLiteFile(profile: profile)
+                }
+            }
+        }
         .task {
             // Wire up tabManager to appState for result caching
             appState.tabManager = tabManager
@@ -109,6 +121,9 @@ struct RootView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .showDiscovery)) { _ in
+            appState.navigation.isShowingDiscovery = true
+        }
         .onReceive(NotificationCenter.default.publisher(for: .showKeyboardShortcuts)) { _ in
             appState.navigation.isShowingKeyboardShortcuts = true
         }
@@ -144,4 +159,27 @@ struct RootView: View {
             if let error = viewModel?.initializationError { Text(error) }
         }
     }
+}
+
+// MARK: - Helpers
+
+/// Fetch or create a DatabaseFileProfile for a discovered file URL, then mark it as opened.
+@MainActor
+private func openDiscoveredDatabase(url: URL, modelContext: ModelContext) -> DatabaseFileProfile {
+    let filePath = url.path
+    let name = url.deletingPathExtension().lastPathComponent
+    let descriptor = FetchDescriptor<DatabaseFileProfile>(
+        predicate: #Predicate { $0.filePath == filePath }
+    )
+    let profile: DatabaseFileProfile
+    if let existing = (try? modelContext.fetch(descriptor))?.first {
+        profile = existing
+    } else {
+        profile = DatabaseFileProfile(name: name, filePath: filePath)
+        modelContext.insert(profile)
+    }
+    profile.lastOpenedAt = Date()
+    profile.updatedAt = Date()
+    try? modelContext.save()
+    return profile
 }

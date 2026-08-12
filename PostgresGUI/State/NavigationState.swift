@@ -21,6 +21,7 @@ class NavigationState {
     var isShowingKeyboardShortcuts: Bool = false
     var isShowingHelp: Bool = false
     var isShowingFileOpen: Bool = false
+    var isShowingDiscovery: Bool = false
 
     // Sheet management helpers
     func showCreateDatabase() {
@@ -29,5 +30,9 @@ class NavigationState {
 
     func showFileOpen() {
         isShowingFileOpen = true
+    }
+
+    func showDiscovery() {
+        isShowingDiscovery = true
     }
 }

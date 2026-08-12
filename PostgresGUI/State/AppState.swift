@@ -66,6 +66,10 @@ class AppState {
         navigation.showFileOpen()
     }
 
+    func showDiscovery() {
+        navigation.showDiscovery()
+    }
+
     // MARK: - Query Execution (forwarding)
 
     func requestTableQuery(for table: TableInfo, limit: Int? = nil) {
