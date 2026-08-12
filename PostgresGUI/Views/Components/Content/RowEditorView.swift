@@ -245,22 +245,6 @@ struct RowEditorView: View {
         .shadow(color: Color.black.opacity(0.05), radius: 1, x: 0, y: 1)
     }
 
-    private func datePickerKind(for dataType: String?) -> DatePickerKind {
-        guard let dataType = dataType?.lowercased() else {
-            return .none
-        }
-        if dataType == "date" {
-            return .date
-        }
-        if dataType.contains("timestamp") {
-            return .dateTime
-        }
-        if dataType.contains("time") {
-            return .time
-        }
-        return .none
-    }
-
     private func datePickerField(
         columnName: String,
         kind: DatePickerKind,
@@ -269,7 +253,7 @@ struct RowEditorView: View {
         DatePicker(
             "",
             selection: Binding(
-                get: { dateValue(for: columnName) ?? Date() },
+                get: { dateValue(for: textValues[columnName]) ?? Date() },
                 set: { newValue in
                     textValues[columnName] = formatDate(newValue, kind: kind)
                 }
@@ -280,88 +264,6 @@ struct RowEditorView: View {
         .labelsHidden()
         .disabled(isDisabled)
         .frame(maxWidth: 380, alignment: .leading)
-    }
-
-    private func dateValue(for columnName: String) -> Date? {
-        guard let text = textValues[columnName], !text.isEmpty else {
-            return nil
-        }
-        if let date = iso8601Formatter.date(from: text) {
-            return date
-        }
-        for formatter in parseFormatters {
-            if let date = formatter.date(from: text) {
-                return date
-            }
-        }
-        return nil
-    }
-
-    private func formatDate(_ date: Date, kind: DatePickerKind) -> String {
-        switch kind {
-        case .date:
-            return dateOnlyFormatter.string(from: date)
-        case .time:
-            return timeOnlyFormatter.string(from: date)
-        case .dateTime:
-            return dateTimeFormatter.string(from: date)
-        case .none:
-            return ""
-        }
-    }
-
-    private var iso8601Formatter: ISO8601DateFormatter {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }
-
-    private var parseFormatters: [DateFormatter] {
-        let dateTimeWithZone = DateFormatter()
-        dateTimeWithZone.locale = Locale(identifier: "en_US_POSIX")
-        dateTimeWithZone.timeZone = TimeZone.current
-        dateTimeWithZone.dateFormat = "yyyy-MM-dd HH:mm:ssXXXXX"
-
-        let dateTime = DateFormatter()
-        dateTime.locale = Locale(identifier: "en_US_POSIX")
-        dateTime.timeZone = TimeZone.current
-        dateTime.dateFormat = "yyyy-MM-dd HH:mm:ss"
-
-        let dateOnly = DateFormatter()
-        dateOnly.locale = Locale(identifier: "en_US_POSIX")
-        dateOnly.timeZone = TimeZone.current
-        dateOnly.dateFormat = "yyyy-MM-dd"
-
-        let timeOnly = DateFormatter()
-        timeOnly.locale = Locale(identifier: "en_US_POSIX")
-        timeOnly.timeZone = TimeZone.current
-        timeOnly.dateFormat = "HH:mm:ss"
-
-        return [dateTimeWithZone, dateTime, dateOnly, timeOnly]
-    }
-
-    private var dateOnlyFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }
-
-    private var timeOnlyFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter
-    }
-
-    private var dateTimeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ssXXXXX"
-        return formatter
     }
 
     private func save() async {
@@ -408,25 +310,5 @@ struct RowEditorView: View {
         }
 
         isSaving = false
-    }
-}
-
-private enum DatePickerKind: String {
-    case none
-    case date
-    case time
-    case dateTime
-
-    var displayedComponents: DatePickerComponents {
-        switch self {
-        case .date:
-            return [.date]
-        case .time:
-            return [.hourAndMinute]
-        case .dateTime:
-            return [.date, .hourAndMinute]
-        case .none:
-            return []
-        }
     }
 }

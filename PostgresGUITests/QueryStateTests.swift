@@ -553,12 +553,12 @@ struct QueryStateTests {
     struct DateParseGatingTests {
 
         @Test func obviousNonDateLongText_skipsParseAttempt() {
-            let longText = String(repeating: "x", count: QueryResultsComponent.maxDateParseLength + 1)
-            #expect(QueryResultsComponent.shouldAttemptDateParsing(longText) == false)
+            let longText = String(repeating: "x", count: QueryResultDateFormatter.maxDateParseLength + 1)
+            #expect(QueryResultDateFormatter.shouldAttemptDateParsing(longText) == false)
         }
 
         @Test func likelyDateValue_attemptsParse() {
-            #expect(QueryResultsComponent.shouldAttemptDateParsing("2026-02-15T10:30:00Z") == true)
+            #expect(QueryResultDateFormatter.shouldAttemptDateParsing("2026-02-15T10:30:00Z") == true)
         }
     }
 }
